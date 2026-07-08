@@ -20,11 +20,24 @@ Milestone 2 adds OpenCode CLI detection and per-project server lifecycle managem
 
 Server state is tracked in memory (not persisted across GlyphDeck restarts).
 
+## Milestone 3 — Sessions and Prompt Loop
+
+Milestone 3 adds OpenCode session management and a non-streaming prompt loop. Registered projects with a ready OpenCode server can create sessions, send prompts, and view assistant responses in the center panel.
+
+Streaming (SSE/EventBridge) starts in Milestone 4. This milestone uses request/response only.
+
 ## Prerequisites
 
 - [Go](https://go.dev/dl/) (1.23+)
 - [Node.js](https://nodejs.org/) (20+) with npm
 - [OpenCode](https://opencode.ai) CLI (`opencode` on PATH) for server management
+
+OpenCode server communication uses HTTP Basic Auth credentials from environment variables:
+
+- `OPENCODE_SERVER_USERNAME` (default: `opencode`)
+- `OPENCODE_SERVER_PASSWORD` (set by OpenCode Desktop)
+
+These must be available in the environment where GlyphDeck's backend runs.
 
 ## Run Locally
 
@@ -64,6 +77,16 @@ Starts Vite dev server (default: `http://localhost:5173`).
 
 OpenCode servers bind to `127.0.0.1` only. Ports are allocated dynamically. Health checks use OpenCode's `/global/health` endpoint.
 
+## Session API
+
+- `GET /api/projects/{projectId}/sessions` — list OpenCode sessions for a project.
+- `POST /api/projects/{projectId}/sessions` — create a new OpenCode session.
+- `GET /api/projects/{projectId}/sessions/{sessionId}` — get session details.
+- `GET /api/projects/{projectId}/sessions/{sessionId}/messages` — list messages in a session.
+- `POST /api/projects/{projectId}/sessions/{sessionId}/prompt` — send a non-streaming prompt and receive the response.
+
+The project's OpenCode server must be in `ready` state. Session/message data is sourced from the OpenCode server, not persisted in GlyphDeck.
+
 ## Manual Smoke Test
 
 Shell: PowerShell 7
@@ -83,15 +106,16 @@ Working directory: project root
 
 3. Add the current GlyphDeck repo path in the left Projects panel.
 4. Confirm the project appears with Git repo status and branch.
-5. Confirm OpenCode detection banner appears (ready or not installed).
+5. Confirm OpenCode detection banner shows ready with version.
 6. Click Start Server.
 7. Confirm server reaches ready with port and version displayed.
-8. Click Stop Server.
-9. Confirm server stops.
-10. Restart the backend.
-11. Confirm the project persists.
-12. Remove the project.
-13. Confirm it disappears.
+8. Click the project to select it (sessions list appears).
+9. Click Create Session.
+10. Click the new session to open it in the center panel.
+11. Type a prompt (e.g., "List the validation commands from README.") and click Send.
+12. Confirm the assistant response appears in the transcript.
+13. Click Stop Server.
+14. Confirm server stops.
 
 ## Validation Commands
 

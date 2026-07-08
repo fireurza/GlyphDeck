@@ -1,10 +1,16 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createProject, deleteProject, fetchProjects } from '../api/projects'
 import { fetchOpencodeStatus, fetchServerStatus, startServer, stopServer } from '../api/opencode'
+import { createSession, fetchSessions } from '../api/sessions'
 import type { Project } from '../types/project'
 import type { OpencodeStatus, ServerStatus } from '../types/opencode'
+import type { GlyphSession } from '../types/session'
 
-function LeftPanel() {
+interface LeftPanelProps {
+  onSelectSession?: (projectId: string, sessionId: string) => void
+}
+
+function LeftPanel({ onSelectSession }: LeftPanelProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -16,6 +22,11 @@ function LeftPanel() {
   const [opencodeStatus, setOpencodeStatus] = useState<OpencodeStatus | null>(null)
   const [serverStatuses, setServerStatuses] = useState<Record<string, ServerStatus>>({})
   const [serverLoading, setServerLoading] = useState<Record<string, boolean>>({})
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [sessions, setSessions] = useState<GlyphSession[]>([])
+  const [isCreatingSession, setIsCreatingSession] = useState(false)
+  const [sessionsLoading, setSessionsLoading] = useState(false)
+  const [sessionError, setSessionError] = useState<string | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -94,6 +105,49 @@ function LeftPanel() {
     return () => controller.abort()
   }, [projects])
 
+  async function handleSelectProject(projectId: string) {
+    setSelectedProjectId(projectId)
+    setSessions([])
+    setSessionError(null)
+
+    try {
+      setSessionsLoading(true)
+      setSessionError(null)
+      const fetched = await fetchSessions(projectId)
+      setSessions(fetched)
+    } catch (sessionLoadError) {
+      setSessionError(
+        sessionLoadError instanceof Error
+          ? sessionLoadError.message
+          : 'Could not load sessions.',
+      )
+    } finally {
+      setSessionsLoading(false)
+    }
+  }
+
+  async function handleCreateSession() {
+    if (!selectedProjectId) return
+
+    try {
+      setIsCreatingSession(true)
+      setSessionError(null)
+      const title = `Session ${new Date().toLocaleTimeString()}`
+      const session = await createSession(selectedProjectId, { title })
+      setSessions((prev) => [...prev, session])
+    } catch (createError) {
+      setSessionError(
+        createError instanceof Error ? createError.message : 'Could not create session.',
+      )
+    } finally {
+      setIsCreatingSession(false)
+    }
+  }
+
+  function handleSelectSession(projectId: string, sessionId: string) {
+    onSelectSession?.(projectId, sessionId)
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -133,6 +187,11 @@ function LeftPanel() {
       setProjects((currentProjects) =>
         currentProjects.filter((project) => project.id !== projectId),
       )
+
+      if (selectedProjectId === projectId) {
+        setSelectedProjectId(null)
+        setSessions([])
+      }
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not remove project.')
     } finally {
@@ -168,6 +227,10 @@ function LeftPanel() {
     }
   }
 
+  const selectedProjectReady =
+    selectedProjectId != null &&
+    serverStatuses[selectedProjectId]?.status === 'ready'
+
   return (
     <aside className="left-panel">
       <div className="panel-header">Projects</div>
@@ -183,6 +246,7 @@ function LeftPanel() {
               onChange={(event) => setName(event.target.value)}
               disabled={isSubmitting}
               required
+              data-testid="project-name-input"
             />
           </div>
           <div className="project-form__field">
@@ -195,6 +259,7 @@ function LeftPanel() {
               onChange={(event) => setPath(event.target.value)}
               disabled={isSubmitting}
               required
+              data-testid="project-path-input"
             />
           </div>
           <label className="project-form__checkbox" htmlFor="project-trusted">
@@ -205,21 +270,22 @@ function LeftPanel() {
               checked={trusted}
               onChange={(event) => setTrusted(event.target.checked)}
               disabled={isSubmitting}
+              data-testid="project-trusted-checkbox"
             />
             Trusted
           </label>
-          <button className="project-form__submit" type="submit" disabled={isSubmitting}>
+          <button className="project-form__submit" type="submit" disabled={isSubmitting} data-testid="add-project-button">
             {isSubmitting ? 'Adding…' : 'Add Project'}
           </button>
         </form>
 
         {opencodeStatus ? (
           opencodeStatus.installed ? (
-            <div className="opencode-banner opencode-banner--ok">
+            <div className="opencode-banner opencode-banner--ok" data-testid="opencode-status-banner">
               OpenCode {opencodeStatus.version} ready
             </div>
           ) : (
-            <div className="opencode-banner opencode-banner--missing">
+            <div className="opencode-banner opencode-banner--missing" data-testid="opencode-status-banner">
               OpenCode not found. Install to start servers.
             </div>
           )
@@ -242,9 +308,10 @@ function LeftPanel() {
             <ul className="project-list__items" aria-label="Registered projects">
               {projects.map((project) => {
                 const isDeleting = deletingIds.has(project.id)
+                const isSelected = selectedProjectId === project.id
 
                 return (
-                  <li className="project-card" key={project.id}>
+                  <li className="project-card" key={project.id} data-testid="project-card">
                     <div className="project-card__main">
                       <div className="project-card__title-row">
                         <h2 className="project-card__name">{project.name}</h2>
@@ -263,10 +330,10 @@ function LeftPanel() {
                       {opencodeStatus?.installed && (
                         <div className="project-card__server">
                           {serverLoading[project.id] ? (
-                            <span className="server-status">Starting server...</span>
+                            <span className="server-status" data-testid="server-status">Starting server...</span>
                           ) : serverStatuses[project.id]?.status === 'ready' ? (
                             <div className="server-info">
-                              <span className="server-status server-status--ready">
+                              <span className="server-status server-status--ready" data-testid="server-status">
                                 Ready on port {serverStatuses[project.id].port}
                               </span>
                               {serverStatuses[project.id].version && (
@@ -276,19 +343,19 @@ function LeftPanel() {
                               )}
                             </div>
                           ) : serverStatuses[project.id]?.status === 'starting' ? (
-                            <span className="server-status server-status--starting">
+                            <span className="server-status server-status--starting" data-testid="server-status">
                               Starting...
                             </span>
                           ) : serverStatuses[project.id]?.status === 'stopping' ? (
-                            <span className="server-status server-status--stopping">
+                            <span className="server-status server-status--stopping" data-testid="server-status">
                               Stopping...
                             </span>
                           ) : serverStatuses[project.id]?.status === 'failed' ? (
-                            <span className="server-status server-status--failed">
+                            <span className="server-status server-status--failed" data-testid="server-status">
                               Start failed
                             </span>
                           ) : (
-                            <span className="server-status">Server stopped</span>
+                            <span className="server-status" data-testid="server-status">Server stopped</span>
                           )}
                           <div className="server-actions">
                             <button
@@ -300,6 +367,7 @@ function LeftPanel() {
                                   serverStatuses[project.id]?.status ?? '',
                                 )
                               }
+                              data-testid="project-start-server-button"
                             >
                               Start Server
                             </button>
@@ -314,6 +382,7 @@ function LeftPanel() {
                                 ) ||
                                 serverStatuses[project.id]?.status === 'stopping'
                               }
+                              data-testid="project-stop-server-button"
                             >
                               Stop Server
                             </button>
@@ -321,21 +390,80 @@ function LeftPanel() {
                         </div>
                       )}
                     </div>
-                    <button
-                      className="project-card__remove"
-                      type="button"
-                      onClick={() => handleDelete(project.id)}
-                      disabled={isDeleting}
-                      aria-label={`Remove ${project.name}`}
-                    >
-                      {isDeleting ? 'Removing…' : 'Remove'}
-                    </button>
+                    <div className="project-card__actions">
+                      <button
+                        className="project-card__remove"
+                        type="button"
+                        onClick={() => handleDelete(project.id)}
+                        disabled={isDeleting}
+                        aria-label={`Remove ${project.name}`}
+                        data-testid="project-remove-button"
+                      >
+                        {isDeleting ? 'Removing…' : 'Remove'}
+                      </button>
+                      <button
+                        className={
+                            'project-card__select' +
+                            (isSelected ? ' project-card__select--active' : '')
+                          }
+                          type="button"
+                          onClick={() => handleSelectProject(project.id)}
+                          aria-label={`Select ${project.name}`}
+                          data-testid="project-select-button"
+                      >
+                        {isSelected ? 'Selected' : 'Select'}
+                      </button>
+                    </div>
                   </li>
                 )
               })}
             </ul>
           ) : null}
         </div>
+
+        {selectedProjectReady && (
+          <div className="session-section" data-testid="sessions-section">
+            <div className="session-section__header">
+              <span className="session-section__title">Sessions</span>
+              <button
+                className="session-section__create-btn"
+                type="button"
+                onClick={() => void handleCreateSession()}
+                disabled={isCreatingSession}
+                data-testid="create-session-button"
+              >
+                {isCreatingSession ? 'Creating…' : '+ Session'}
+              </button>
+            </div>
+
+            {sessionError ? (
+              <p className="project-message project-message--error" role="alert">
+                {sessionError}
+              </p>
+            ) : null}
+
+            {sessionsLoading ? (
+              <p className="project-message">Loading sessions…</p>
+            ) : sessions.length === 0 ? (
+              <p className="project-message">No sessions yet.</p>
+            ) : (
+              <ul className="session-list">
+                {sessions.map((session) => (
+                  <li key={session.id}>
+                    <button
+                      className="session-item"
+                      type="button"
+                      onClick={() => handleSelectSession(selectedProjectId!, session.id)}
+                      data-testid="session-item"
+                    >
+                      {session.title}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </aside>
   )

@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"glyphdeck/internal/devtools"
 	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/servers"
+	"glyphdeck/internal/sessions"
 	"log"
 	"net"
 	"net/http"
@@ -37,6 +39,14 @@ func main() {
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	projects.RegisterHandlers(mux, registry)
 	servers.RegisterHandlers(mux, manager)
+
+	// Sessions.
+	sessionProjectAdapter := &sessionProjectResolverAdapter{registry: registry}
+	sessionsMgr := sessions.NewManager(manager, sessionProjectAdapter)
+	sessions.RegisterHandlers(mux, sessionsMgr)
+
+	// Dev tools — only registered when GLYPHDECK_DEV_TOOLS=1.
+	devtools.RegisterHandlers(mux, registry, manager)
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -104,4 +114,20 @@ func (a *projectResolverAdapter) Get(ctx context.Context, id string) (servers.Pr
 		return servers.ProjectInfo{}, err
 	}
 	return servers.ProjectInfo{ID: project.ID, Name: project.Name, Path: project.Path}, nil
+}
+
+// sessionProjectResolverAdapter adapts the projects.Registry to sessions.ProjectResolver.
+type sessionProjectResolverAdapter struct {
+	registry *projects.Registry
+}
+
+func (a *sessionProjectResolverAdapter) Get(ctx context.Context, id string) (sessions.ProjectInfo, error) {
+	project, err := a.registry.Get(ctx, id)
+	if errors.Is(err, projects.ErrProjectNotFound) {
+		return sessions.ProjectInfo{}, sessions.ErrProjectNotFound
+	}
+	if err != nil {
+		return sessions.ProjectInfo{}, err
+	}
+	return sessions.ProjectInfo{ID: project.ID, Path: project.Path}, nil
 }

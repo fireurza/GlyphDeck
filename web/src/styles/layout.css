@@ -469,3 +469,224 @@
   opacity: 0.65;
   cursor: not-allowed;
 }
+
+/* Project card actions row */
+.project-card__actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.project-card__select {
+  align-self: flex-start;
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.project-card__select:hover {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
+.project-card__select--active {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.project-card__select:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Session list */
+.session-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--color-border);
+}
+
+.session-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.session-section__title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.session-section__create-btn {
+  padding: 3px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+}
+
+.session-section__create-btn:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
+.session-section__create-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.session-section__create-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.session-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.session-item {
+  width: 100%;
+  padding: 6px 8px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  color: var(--color-text-muted);
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+}
+
+.session-item:hover {
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.session-item:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+/* Center panel — session */
+.center-panel__session-header {
+  padding: 8px 12px;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.center-panel__transcript {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.transcript-message {
+  max-width: 80%;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: var(--font-size-base);
+  line-height: 1.5;
+}
+
+.transcript-message--user {
+  align-self: flex-end;
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.transcript-message--assistant {
+  align-self: flex-start;
+  background: var(--color-bg-alt);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+}
+
+.transcript-message__role {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin-bottom: 4px;
+  color: var(--color-text-muted);
+}
+
+.transcript-message__text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Prompt composer */
+.prompt-composer {
+  display: flex;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.prompt-composer__input {
+  flex: 1;
+  min-height: 36px;
+  max-height: 120px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-bg-alt);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--font-size-base);
+  resize: vertical;
+}
+
+.prompt-composer__input:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.prompt-composer__send {
+  padding: 8px 16px;
+  border: 1px solid var(--color-accent);
+  border-radius: 6px;
+  background: var(--color-accent);
+  color: var(--color-bg-alt);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.prompt-composer__send:hover:not(:disabled) {
+  background: #666666;
+}
+
+.prompt-composer__send:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.prompt-composer__send:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}

@@ -31,6 +31,18 @@ func NewManager(detector opencode.Detector, resolver ProjectResolver) *ServerMan
 	}
 }
 
+// GetBaseURL returns the HTTP base URL for a project's running OpenCode server.
+// Returns an error if the server is not ready.
+func (m *ServerManager) GetBaseURL(ctx context.Context, projectID string) (string, error) {
+	m.mu.RLock()
+	mp, exists := m.processes[projectID]
+	m.mu.RUnlock()
+	if !exists || mp.state != StateReady {
+		return "", fmt.Errorf("server not ready for project %s", projectID)
+	}
+	return fmt.Sprintf("http://127.0.0.1:%d", mp.port), nil
+}
+
 // OpencodeStatus reports whether the OpenCode CLI is installed.
 func (m *ServerManager) OpencodeStatus() opencode.DetectionResult {
 	return m.detector.Detect()
@@ -333,15 +345,39 @@ func isNonTerminal(state string) bool {
 // getOpenCodeCreds reads OpenCode server credentials from environment.
 // When no password is set, username is cleared so callers can skip BasicAuth entirely.
 func getOpenCodeCreds() (username, password string) {
-	password = os.Getenv("OPENCODE_SERVER_PASSWORD")
-	if password == "" {
-		return "", ""
+	return opencode.GetServerCreds()
+}
+
+// StopAllAppOwned stops all tracked server processes and returns their details.
+// Only stops app-owned tracked processes — never kills global opencode.
+func (m *ServerManager) StopAllAppOwned(ctx context.Context) ([]StoppedServerInfo, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	result := make([]StoppedServerInfo, 0, len(m.processes))
+	for projectID, mp := range m.processes {
+		mp.cancel()
+		done := make(chan struct{})
+		go func() { _ = mp.cmd.Wait(); close(done) }()
+		select {
+		case <-done:
+		case <-time.After(3 * time.Second):
+			_ = mp.cmd.Process.Kill()
+		}
+
+		info := StoppedServerInfo{
+			ProjectID: projectID,
+			Port:      mp.port,
+			Status:    StateStopped,
+		}
+		if mp.cmd.Process != nil {
+			info.PID = mp.cmd.Process.Pid
+		}
+		result = append(result, info)
 	}
-	username = os.Getenv("OPENCODE_SERVER_USERNAME")
-	if username == "" {
-		username = "opencode"
-	}
-	return username, password
+
+	m.processes = make(map[string]*managedProcess)
+	return result, nil
 }
 
 // allocatePort finds a free loopback TCP port.
