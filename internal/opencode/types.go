@@ -1,0 +1,49 @@
+package opencode
+
+import "context"
+
+// SessionClient abstracts OpenCode session API operations for testability.
+type SessionClient interface {
+	ListSessions(ctx context.Context, directory string) ([]Session, error)
+	CreateSession(ctx context.Context, title, directory string) (Session, error)
+	GetSession(ctx context.Context, sessionID string) (Session, error)
+	ListMessages(ctx context.Context, sessionID string) ([]Message, error)
+	SendPrompt(ctx context.Context, sessionID, text string) (PromptResult, error)
+}
+
+// Session represents an OpenCode session.
+type Session struct {
+	ID        string `json:"id"`
+	Title     string `json:"title"`
+	Directory string `json:"directory"`
+	ProjectID string `json:"projectID"`
+	Time      any    `json:"time,omitempty"`
+	Agent     string `json:"agent,omitempty"`
+	Model     any    `json:"model,omitempty"`
+}
+
+// Message represents a message within an OpenCode session.
+type Message struct {
+	Info  MessageInfo `json:"info"`
+	Parts []Part      `json:"parts"`
+}
+
+// MessageInfo carries metadata about a message.
+type MessageInfo struct {
+	ID   string `json:"id"`
+	Role string `json:"role"`
+}
+
+// Part holds a piece of message content.
+type Part struct {
+	Type string `json:"type"`
+	Text string `json:"text,omitempty"`
+}
+
+// PromptResult captures the assistant response from SendPrompt.
+type PromptResult struct {
+	MessageID string
+	Role      string
+	Text      string
+	Parts     []Part
+}

@@ -2,6 +2,13 @@ import { useState } from 'react'
 
 const TABS = ['Review', 'Usage', 'Tasks', 'Agents'] as const
 
+const TAB_TEST_IDS: Record<string, string> = {
+  Review: 'review-tab',
+  Usage: 'usage-tab',
+  Tasks: 'tasks-tab',
+  Agents: 'agents-tab',
+}
+
 function RightPanel() {
   const [activeTab, setActiveTab] = useState<string>('Review')
 
@@ -13,6 +20,7 @@ function RightPanel() {
             key={tab}
             className={`tab-bar__tab ${activeTab === tab ? 'active' : ''}`}
             onClick={() => setActiveTab(tab)}
+            data-testid={TAB_TEST_IDS[tab]}
           >
             {tab}
           </button>

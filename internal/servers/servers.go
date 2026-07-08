@@ -50,6 +50,14 @@ type ServerStatus struct {
 	Version   string `json:"version,omitempty"`
 }
 
+// StoppedServerInfo reports the result of stopping a tracked server process.
+type StoppedServerInfo struct {
+	ProjectID string `json:"projectId"`
+	Port      int    `json:"port"`
+	PID       int    `json:"pid"`
+	Status    string `json:"status"`
+}
+
 // managedProcess holds the runtime state of a launched server.
 type managedProcess struct {
 	projectID string
