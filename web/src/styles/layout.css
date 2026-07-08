@@ -231,7 +231,7 @@
 }
 
 .project-form__submit:hover:not(:disabled) {
-  background: #78b7e6;
+  background: #666666;
 }
 
 .project-card__remove:hover:not(:disabled) {
@@ -373,4 +373,99 @@
   font-size: var(--font-size-sm);
   opacity: 0.6;
   font-style: italic;
+}
+
+/* OpenCode banner */
+.opencode-banner {
+  padding: 8px;
+  border-radius: 6px;
+  font-size: var(--font-size-sm);
+}
+
+.opencode-banner--ok {
+  background: #1a2a1a;
+  border: 1px solid #2a4a2a;
+  color: #a0d0a0;
+}
+
+.opencode-banner--missing {
+  background: #2a1515;
+  border: 1px solid #7a2f2f;
+  color: #ffb3b3;
+}
+
+/* Server controls */
+.project-card__server {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border);
+}
+
+.server-status {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  display: block;
+  margin-bottom: 6px;
+}
+
+.server-status--ready {
+  color: #a0d0a0;
+}
+
+.server-status--starting,
+.server-status--stopping {
+  color: #d0c080;
+}
+
+.server-status--failed {
+  color: #ffb3b3;
+}
+
+.server-info {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.server-version {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.server-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.server-btn {
+  padding: 4px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.server-btn:hover:not(:disabled) {
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
+.server-btn--start:hover:not(:disabled) {
+  border-color: #4a7a4a;
+  color: #a0d0a0;
+}
+
+.server-btn--stop:hover:not(:disabled) {
+  border-color: #7a4a4a;
+  color: #ffb3b3;
+}
+
+.server-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }

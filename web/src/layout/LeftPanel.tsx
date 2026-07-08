@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createProject, deleteProject, fetchProjects } from '../api/projects'
+import { fetchOpencodeStatus, fetchServerStatus, startServer, stopServer } from '../api/opencode'
 import type { Project } from '../types/project'
+import type { OpencodeStatus, ServerStatus } from '../types/opencode'
 
 function LeftPanel() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -11,6 +13,9 @@ function LeftPanel() {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set())
   const [error, setError] = useState<string | null>(null)
+  const [opencodeStatus, setOpencodeStatus] = useState<OpencodeStatus | null>(null)
+  const [serverStatuses, setServerStatuses] = useState<Record<string, ServerStatus>>({})
+  const [serverLoading, setServerLoading] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const controller = new AbortController()
@@ -37,6 +42,57 @@ function LeftPanel() {
 
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    async function loadOpencodeStatus() {
+      try {
+        const status = await fetchOpencodeStatus(controller.signal)
+        if (!controller.signal.aborted) {
+          setOpencodeStatus(status)
+        }
+      } catch {
+        // OpenCode status unavailable — leave as null
+      }
+    }
+
+    loadOpencodeStatus()
+
+    return () => controller.abort()
+  }, [])
+
+  useEffect(() => {
+    if (projects.length === 0) {
+      return
+    }
+
+    const controller = new AbortController()
+
+    async function loadServerStatuses() {
+      const statuses: Record<string, ServerStatus> = {}
+
+      for (const project of projects) {
+        if (controller.signal.aborted) {
+          break
+        }
+
+        try {
+          statuses[project.id] = await fetchServerStatus(project.id, controller.signal)
+        } catch {
+          // Server status unavailable for this project — skip
+        }
+      }
+
+      if (!controller.signal.aborted) {
+        setServerStatuses(statuses)
+      }
+    }
+
+    loadServerStatuses()
+
+    return () => controller.abort()
+  }, [projects])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -74,7 +130,9 @@ function LeftPanel() {
       setDeletingIds((currentIds) => new Set(currentIds).add(projectId))
       setError(null)
       await deleteProject(projectId)
-      setProjects((currentProjects) => currentProjects.filter((project) => project.id !== projectId))
+      setProjects((currentProjects) =>
+        currentProjects.filter((project) => project.id !== projectId),
+      )
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'Could not remove project.')
     } finally {
@@ -83,6 +141,30 @@ function LeftPanel() {
         nextIds.delete(projectId)
         return nextIds
       })
+    }
+  }
+
+  async function handleStartServer(projectId: string) {
+    try {
+      setServerLoading((prev) => ({ ...prev, [projectId]: true }))
+      const status = await startServer(projectId)
+      setServerStatuses((prev) => ({ ...prev, [projectId]: status }))
+    } catch (startError) {
+      setError(startError instanceof Error ? startError.message : 'Could not start server')
+    } finally {
+      setServerLoading((prev) => ({ ...prev, [projectId]: false }))
+    }
+  }
+
+  async function handleStopServer(projectId: string) {
+    try {
+      setServerLoading((prev) => ({ ...prev, [projectId]: true }))
+      const status = await stopServer(projectId)
+      setServerStatuses((prev) => ({ ...prev, [projectId]: status }))
+    } catch (stopError) {
+      setError(stopError instanceof Error ? stopError.message : 'Could not stop server')
+    } finally {
+      setServerLoading((prev) => ({ ...prev, [projectId]: false }))
     }
   }
 
@@ -131,6 +213,18 @@ function LeftPanel() {
           </button>
         </form>
 
+        {opencodeStatus ? (
+          opencodeStatus.installed ? (
+            <div className="opencode-banner opencode-banner--ok">
+              OpenCode {opencodeStatus.version} ready
+            </div>
+          ) : (
+            <div className="opencode-banner opencode-banner--missing">
+              OpenCode not found. Install to start servers.
+            </div>
+          )
+        ) : null}
+
         {error ? (
           <p className="project-message project-message--error" role="alert">
             {error}
@@ -166,6 +260,66 @@ function LeftPanel() {
                           ? `Git repo · ${project.git.branch || 'No branch'}`
                           : 'Not a Git repo'}
                       </p>
+                      {opencodeStatus?.installed && (
+                        <div className="project-card__server">
+                          {serverLoading[project.id] ? (
+                            <span className="server-status">Starting server...</span>
+                          ) : serverStatuses[project.id]?.status === 'ready' ? (
+                            <div className="server-info">
+                              <span className="server-status server-status--ready">
+                                Ready on port {serverStatuses[project.id].port}
+                              </span>
+                              {serverStatuses[project.id].version && (
+                                <span className="server-version">
+                                  v{serverStatuses[project.id].version}
+                                </span>
+                              )}
+                            </div>
+                          ) : serverStatuses[project.id]?.status === 'starting' ? (
+                            <span className="server-status server-status--starting">
+                              Starting...
+                            </span>
+                          ) : serverStatuses[project.id]?.status === 'stopping' ? (
+                            <span className="server-status server-status--stopping">
+                              Stopping...
+                            </span>
+                          ) : serverStatuses[project.id]?.status === 'failed' ? (
+                            <span className="server-status server-status--failed">
+                              Start failed
+                            </span>
+                          ) : (
+                            <span className="server-status">Server stopped</span>
+                          )}
+                          <div className="server-actions">
+                            <button
+                              className="server-btn server-btn--start"
+                              onClick={() => handleStartServer(project.id)}
+                              disabled={
+                                serverLoading[project.id] ||
+                                ['starting', 'ready', 'stopping'].includes(
+                                  serverStatuses[project.id]?.status ?? '',
+                                )
+                              }
+                            >
+                              Start Server
+                            </button>
+                            <button
+                              className="server-btn server-btn--stop"
+                              onClick={() => handleStopServer(project.id)}
+                              disabled={
+                                serverLoading[project.id] ||
+                                !serverStatuses[project.id] ||
+                                ['stopped', 'not-installed', undefined].includes(
+                                  serverStatuses[project.id]?.status,
+                                ) ||
+                                serverStatuses[project.id]?.status === 'stopping'
+                              }
+                            >
+                              Stop Server
+                            </button>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <button
                       className="project-card__remove"

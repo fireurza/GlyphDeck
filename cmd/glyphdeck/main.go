@@ -3,7 +3,10 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/projects"
+	"glyphdeck/internal/servers"
 	"log"
 	"net"
 	"net/http"
@@ -25,9 +28,15 @@ func main() {
 		log.Fatalf("project registry error: %v", err)
 	}
 
+	// OpenCode detection and server manager.
+	detector := opencode.NewDetector()
+	adapter := &projectResolverAdapter{registry: registry}
+	manager := servers.NewManager(detector, adapter)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	projects.RegisterHandlers(mux, registry)
+	servers.RegisterHandlers(mux, manager)
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -79,4 +88,20 @@ func isLoopbackHost(host string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// projectResolverAdapter adapts the projects.Registry to servers.ProjectResolver.
+type projectResolverAdapter struct {
+	registry *projects.Registry
+}
+
+func (a *projectResolverAdapter) Get(ctx context.Context, id string) (servers.ProjectInfo, error) {
+	project, err := a.registry.Get(ctx, id)
+	if errors.Is(err, projects.ErrProjectNotFound) {
+		return servers.ProjectInfo{}, servers.ErrProjectNotFound
+	}
+	if err != nil {
+		return servers.ProjectInfo{}, err
+	}
+	return servers.ProjectInfo{ID: project.ID, Name: project.Name, Path: project.Path}, nil
 }

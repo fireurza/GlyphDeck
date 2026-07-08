@@ -1,6 +1,6 @@
 # GlyphDeck
 
-GlyphDeck is a local web workspace for registering project directories and showing their basic repository status.
+GlyphDeck is a local web workspace for managing projects, detecting OpenCode, and running per-project OpenCode servers.
 
 ## Milestone 1 — Project Registry
 
@@ -14,10 +14,17 @@ Registry data is stored at:
 
 `.glyphdeck/` is local development data and is ignored by Git.
 
+## Milestone 2 — OpenCode Server Manager
+
+Milestone 2 adds OpenCode CLI detection and per-project server lifecycle management. Each registered project can start and stop an `opencode serve` instance bound to a dynamic loopback port.
+
+Server state is tracked in memory (not persisted across GlyphDeck restarts).
+
 ## Prerequisites
 
 - [Go](https://go.dev/dl/) (1.23+)
 - [Node.js](https://nodejs.org/) (20+) with npm
+- [OpenCode](https://opencode.ai) CLI (`opencode` on PATH) for server management
 
 ## Run Locally
 
@@ -48,6 +55,15 @@ Starts Vite dev server (default: `http://localhost:5173`).
 - `GET /api/projects/{projectId}` — get one registered project.
 - `DELETE /api/projects/{projectId}` — remove one registered project.
 
+## OpenCode Server API
+
+- `GET /api/opencode` — detect OpenCode CLI and version.
+- `GET /api/projects/{projectId}/server` — get server status for a project.
+- `POST /api/projects/{projectId}/server/start` — start an OpenCode server.
+- `POST /api/projects/{projectId}/server/stop` — stop an OpenCode server.
+
+OpenCode servers bind to `127.0.0.1` only. Ports are allocated dynamically. Health checks use OpenCode's `/global/health` endpoint.
+
 ## Manual Smoke Test
 
 Shell: PowerShell 7
@@ -67,10 +83,15 @@ Working directory: project root
 
 3. Add the current GlyphDeck repo path in the left Projects panel.
 4. Confirm the project appears with Git repo status and branch.
-5. Restart the backend.
-6. Confirm the project persists.
-7. Remove the project.
-8. Confirm it disappears.
+5. Confirm OpenCode detection banner appears (ready or not installed).
+6. Click Start Server.
+7. Confirm server reaches ready with port and version displayed.
+8. Click Stop Server.
+9. Confirm server stops.
+10. Restart the backend.
+11. Confirm the project persists.
+12. Remove the project.
+13. Confirm it disappears.
 
 ## Validation Commands
 
@@ -103,6 +124,9 @@ Stop-Process -Id $glyphdeckPortProcess -Force
 # Kill stuck frontend on port 5173 (adjust port if Vite uses another)
 $vitePortProcess = Get-NetTCPConnection -LocalPort 5173 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
 Stop-Process -Id $vitePortProcess -Force
+
+# Kill stuck OpenCode processes (if left running by GlyphDeck)
+Get-Process opencode -ErrorAction SilentlyContinue | Stop-Process -Force
 ```
 
 **Linux/macOS:**
