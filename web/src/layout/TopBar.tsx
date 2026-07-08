@@ -4,7 +4,7 @@ function TopBar() {
       <div className="top-bar__title">GlyphDeck</div>
       <div className="top-bar__status">
         <span className="status-indicator" title="Backend not connected" />
-        <span className="status-text">Milestone 0</span>
+        <span className="status-text">Milestone 1</span>
       </div>
     </header>
   )
