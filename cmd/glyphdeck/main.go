@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"fmt"
+	"glyphdeck/internal/projects"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,10 +16,18 @@ import (
 func main() {
 	host := getEnv("GLYPHDECK_HOST", "127.0.0.1")
 	port := getEnv("GLYPHDECK_PORT", "8756")
-	addr := fmt.Sprintf("%s:%s", host, port)
+	if !isLoopbackHost(host) {
+		log.Fatalf("server host must be loopback-only; set GLYPHDECK_HOST to 127.0.0.1 or localhost")
+	}
+	addr := net.JoinHostPort(host, port)
+	registry, err := projects.NewRegistry(projects.DefaultStoragePath())
+	if err != nil {
+		log.Fatalf("project registry error: %v", err)
+	}
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
+	projects.RegisterHandlers(mux, registry)
 
 	srv := &http.Server{
 		Addr:         addr,
@@ -62,4 +71,12 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+func isLoopbackHost(host string) bool {
+	if host == "localhost" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	return ip != nil && ip.IsLoopback()
 }
