@@ -54,4 +54,35 @@ cd web && npm run build
 cd web && npm run dev
 ```
 
+### Stopping Dev Servers
+
+**Normal stop:**
+
+- Press `Ctrl+C` in the terminal running `go run ./cmd/glyphdeck` to stop the backend.
+- Press `Ctrl+C` in the terminal running `npm run dev` to stop the frontend.
+
+**Kill stuck port (Windows):**
+
+If a server process is left running and the port is stuck:
+
+```powershell
+# Kill stuck backend on port 8756
+$glyphdeckPortProcess = Get-NetTCPConnection -LocalPort 8756 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
+Stop-Process -Id $glyphdeckPortProcess -Force
+
+# Kill stuck frontend on port 5173 (adjust port if Vite uses another)
+$vitePortProcess = Get-NetTCPConnection -LocalPort 5173 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
+Stop-Process -Id $vitePortProcess -Force
+```
+
+**Linux/macOS:**
+
+```bash
+# Backend
+lsof -ti:8756 | xargs kill -9
+
+# Frontend
+lsof -ti:5173 | xargs kill -9
+```
+
 **Note:** OpenCode integration begins in later milestones. Milestone 0 is purely a scaffold with placeholder panels.

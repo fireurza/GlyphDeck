@@ -7,15 +7,15 @@
 }
 
 :root {
-  --color-bg: #1e1e2e;
-  --color-bg-alt: #181825;
-  --color-surface: #313244;
-  --color-surface-alt: #45475a;
-  --color-text: #cdd6f4;
-  --color-text-muted: #a6adc8;
-  --color-accent: #89b4fa;
-  --color-border: #45475a;
-  --color-tab-active: #89b4fa;
+  --color-bg: #1a1a1a;
+  --color-bg-alt: #121212;
+  --color-surface: #2a2a2a;
+  --color-surface-alt: #3a3a3a;
+  --color-text: #e0e0e0;
+  --color-text-muted: #888888;
+  --color-accent: #569cd6;
+  --color-border: #333333;
+  --color-tab-active: #569cd6;
   --font-family: system-ui, -apple-system, sans-serif;
   --font-size-sm: 0.8rem;
   --font-size-base: 0.9rem;
