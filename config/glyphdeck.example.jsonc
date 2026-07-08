@@ -1,0 +1,16 @@
+// GlyphDeck configuration
+// Copy to glyphdeck.jsonc and customize before use.
+{
+  // Server settings
+  "host": "127.0.0.1",
+  "port": 8756,
+  
+  // OpenCode settings (future milestone)
+  "opencode": {
+    "path": "",
+    "port": 0
+  },
+  
+  // Project directories
+  "projectsDir": "./projects"
+}

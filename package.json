@@ -1,0 +1,10 @@
+{
+  "name": "glyphdeck",
+  "private": true,
+  "description": "Local web-based workspace for managing OpenCode AI coding sessions",
+  "scripts": {
+    "dev:frontend": "cd web && npm run dev",
+    "build:frontend": "cd web && npm run build",
+    "dev:backend": "go run ./cmd/glyphdeck"
+  }
+}
