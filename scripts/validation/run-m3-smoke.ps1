@@ -118,13 +118,13 @@ async function waitFor(predicate, timeoutMs = 30000, pollMs = 500) {
   await page.screenshot({ path: path.join(outDir, '04-session-created.png') });
   console.log('04-session-created');
 
-  // 6. Click session item
-  const sessionItems = page.getByTestId('session-item');
-  const count = await sessionItems.count();
-  if (count > 0) {
-    await sessionItems.first().click();
-    await page.waitForTimeout(500);
+  // 6. Select the newly created session by title (deterministic, not positional)
+  const sessionTitle = await page.getByTestId('session-item').first().textContent();
+  if (sessionTitle) {
+    await page.getByTestId('session-item').filter({ hasText: sessionTitle.trim() }).click();
+    console.log('Session selected:', sessionTitle.trim());
   }
+  await page.waitForTimeout(500);
 
   // 7. Type and send prompt
   await page.getByTestId('prompt-composer-input').fill('Inspect this repo and list the validation commands from README.');

@@ -39,7 +39,8 @@ Desktop Docker Sandbox mode: not used
 | Milestone 0 — Repo bootstrap | Accepted | c4a4853 | Go backend, React/Vite shell, baseline layout |
 | Milestone 1 — Project registry | Accepted | e7c6ddc + validation cleanup | Project add/list/delete, JSON persistence, Git detection |
 | Milestone 2 — OpenCode server manager | Accepted | f64f0a8 | OpenCode detection, start/stop server, ready/version UI |
-| Milestone 3.5 — Validation Harness Hardening | Accepted | Pending commit | data-testid selectors, dev/test endpoints, validation scripts, M3 smoke re-validated |
+| Milestone 3 — Sessions and prompt loop | Accepted | c8ba09d | M3 smoke re-validated in M3.5 harness |
+| Milestone 3.5 — Validation Harness Hardening | Accepted | c8ba09d | data-testid selectors, dev/test endpoints, validation scripts, M3 smoke re-validated |
 
 ---
 
@@ -47,8 +48,6 @@ Desktop Docker Sandbox mode: not used
 
 | Milestone | Status | Reason |
 |---|---:|---|
-| Milestone 3 — Sessions and prompt loop | Not accepted | Validation was unreliable: stale sessions, stale screenshots, visible cmd/Notepad, global process cleanup, weak assistant-response proof |
-
 ---
 
 ## Current Next Step
