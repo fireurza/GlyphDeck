@@ -43,7 +43,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 3.5 — Validation Harness Hardening | Accepted | c8ba09d | data-testid selectors, dev/test endpoints, validation scripts, M3 smoke re-validated |
 | Milestone 4 — EventBridge streaming | Accepted | 6fe2911 | Real OpenCode /event SSE parser fix; live streaming proven end-to-end (backend probe + browser smoke, exact streamed text); connected status real; fresh-session selection by id |
 | Milestone 5 — Agent Terminal | Accepted | 732e22b | Fixed Stop Server/session-list flex-collapse overlap (root-caused via DOM measurement); read-only Agent Terminal fed live from existing M4 event stream, bounded 300-row client log, category filters, Clear; no new backend endpoint needed (documented in README) |
-| Milestone 6 — Usage tab | Accepted | <commit-hash> | Backend usage aggregation from OpenCode assistant messages, dedicated GET endpoint, frontend Usage panel with provider/model/token/cost display, error/loading/empty states, Refresh button |
+| Milestone 6 — Usage tab | Accepted | e08a1b0 | Backend usage aggregation from OpenCode assistant messages, dedicated GET endpoint, frontend Usage panel with provider/model/token/cost display, error/loading/empty states, Refresh button |
 
 ---
 
@@ -58,11 +58,10 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-Milestone 6 — Usage tab
+Milestone 7 — Review tab
 ```
 
-Milestone 5 accepted (Agent Terminal + Stop Server/session-list layout fix
-validated). Milestone 6 may now begin.
+Milestone 6 accepted (Usage tab with backend aggregation endpoint + frontend panel validated).
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -74,10 +73,10 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 5 accepted; bump to Milestone 6 when M6 work begins):
+Current expected label (Milestone 6 accepted; bump to Milestone 7 when M7 work begins):
 
 ```text
-Milestone 5
+Milestone 6
 ```
 
 Rules:
@@ -166,7 +165,6 @@ MVP: Go binary serving embedded React assets
 Do not implement these until their milestone:
 
 ```text
-Usage tab aggregation
 Review tab data
 Permissions popup
 Questions UI
