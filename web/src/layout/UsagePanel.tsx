@@ -7,7 +7,7 @@ interface UsagePanelProps {
   selectedSessionId?: string | null
 }
 
-type PanelState = 'empty' | 'loading' | 'error' | 'data'
+type PanelState = 'empty' | 'loading' | 'error' | 'unavailable' | 'data'
 
 function formatCost(cost: number): string {
   if (cost === 0) return '$0.00'
@@ -47,7 +47,11 @@ function UsagePanel({ selectedProjectId, selectedSessionId }: UsagePanelProps) {
       const result = await fetchUsage(selectedProjectId, selectedSessionId, ctrl.signal)
       if (!ctrl.signal.aborted) {
         setData(result)
-        setPanelState('data')
+        if (result.available) {
+          setPanelState('data')
+        } else {
+          setPanelState('unavailable')
+        }
       }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
@@ -102,6 +106,20 @@ function UsagePanel({ selectedProjectId, selectedSessionId }: UsagePanelProps) {
           >
             {errorMessage}
           </p>
+        )}
+
+        {panelState === 'unavailable' && (
+          <div className="usage-unavailable" data-testid="usage-unavailable-state">
+            <p className="usage-unavailable__heading">Usage data unavailable</p>
+            <p className="usage-unavailable__reason">
+              {data?.reason || 'OpenCode did not provide usage fields for this session yet.'}
+            </p>
+            {data?.providerID && (
+              <p className="usage-unavailable__meta">
+                Provider: {data.providerID} / Model: {data.modelID}
+              </p>
+            )}
+          </div>
         )}
 
         {panelState === 'data' && data && (

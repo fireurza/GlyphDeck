@@ -939,3 +939,28 @@
   text-align: right;
   overflow-wrap: anywhere;
 }
+
+/* Usage — unavailable state */
+.usage-unavailable {
+  padding: 16px 0;
+  text-align: center;
+}
+
+.usage-unavailable__heading {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+}
+
+.usage-unavailable__reason {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  margin-bottom: 4px;
+}
+
+.usage-unavailable__meta {
+  font-size: var(--font-size-sm);
+  color: var(--color-text-muted);
+  font-style: italic;
+}
