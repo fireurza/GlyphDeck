@@ -47,6 +47,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 7 — Review tab | Accepted | 8d3639b | Review tab with project/Git/session/activity summary; M7 smoke captured 14 fresh screenshots; Usage and Agent Terminal regressions verified |
 | Milestone 8 — Permissions | Accepted | a004682 | Permission approval popup with once/always/reject; forced-bash rule triggers popup; dismiss and resume verified; M5/M6/M7 regressions clean |
 | Milestone 9 — User Terminal | Accepted | 4473bab | Interactive shell via exec.Command pipes (PTY unsupported on Windows with current stack); SSE output streaming; HTTP POST input; start/run/close verified; layout preserved |
+| Milestone 10 — POC hardening | Accepted | 96715c5 | Browser refresh preserves project state (localStorage); graceful shutdown stops app-owned servers/terminals; Problems tab with bounded ring buffer; terminal output timer-based flush; complete README docs |
 
 ---
 
@@ -61,10 +62,10 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-Milestone 10 — POC hardening pass
+Phase 2 — MVP / v0.1.0 planning
 ```
 
-Milestone 9 accepted (User Terminal with interactive shell via exec.Command pipes).
+Milestone 10 accepted (POC hardening: browser refresh, problems tab, graceful shutdown, README docs).
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -76,10 +77,10 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 9 accepted; bump to Milestone 10 when M10 work begins):
+Current expected label (Milestone 10 accepted; bump to MVP label when M11 work begins):
 
 ```text
-Milestone 9
+Milestone 10
 ```
 
 Rules:
