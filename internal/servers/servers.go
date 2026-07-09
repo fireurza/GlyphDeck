@@ -40,6 +40,13 @@ type ProjectResolver interface {
 	Get(ctx context.Context, id string) (ProjectInfo, error)
 }
 
+// EventBridgeManager is an optional hook for managing event bridges per project.
+// If set, the ServerManager calls it whenever a server transitions to Ready or Stopped.
+type EventBridgeManager interface {
+	StartEventBridge(projectID, baseURL string) error
+	StopEventBridge(projectID string)
+}
+
 // ServerStatus reports the current state of a managed server.
 type ServerStatus struct {
 	ProjectID string `json:"projectId"`

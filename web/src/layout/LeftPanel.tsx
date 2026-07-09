@@ -7,10 +7,11 @@ import type { OpencodeStatus, ServerStatus } from '../types/opencode'
 import type { GlyphSession } from '../types/session'
 
 interface LeftPanelProps {
+  onSelectProject?: (projectId: string) => void
   onSelectSession?: (projectId: string, sessionId: string) => void
 }
 
-function LeftPanel({ onSelectSession }: LeftPanelProps) {
+function LeftPanel({ onSelectProject, onSelectSession }: LeftPanelProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -107,6 +108,7 @@ function LeftPanel({ onSelectSession }: LeftPanelProps) {
 
   async function handleSelectProject(projectId: string) {
     setSelectedProjectId(projectId)
+    onSelectProject?.(projectId)
     setSessions([])
     setSessionError(null)
 
@@ -455,6 +457,7 @@ function LeftPanel({ onSelectSession }: LeftPanelProps) {
                       type="button"
                       onClick={() => handleSelectSession(selectedProjectId!, session.id)}
                       data-testid="session-item"
+                      data-session-id={session.id}
                     >
                       {session.title}
                     </button>

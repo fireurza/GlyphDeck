@@ -70,6 +70,14 @@ func (m *mockSessionClient) SendPrompt(_ context.Context, _, _ string) (opencode
 	return m.result, m.err
 }
 
+func (m *mockSessionClient) StreamEvents(_ context.Context) (<-chan opencode.NormalizedEvent, <-chan error) {
+	events := make(chan opencode.NormalizedEvent)
+	errs := make(chan error)
+	close(events)
+	close(errs)
+	return events, errs
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
