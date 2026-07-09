@@ -1,18 +1,24 @@
-# GlyphDeck build script (PowerShell)
-
+# GlyphDeck release build script (Windows)
 $ErrorActionPreference = "Stop"
+$repoRoot = Resolve-Path (Join-Path $PSScriptRoot "..")
+Write-Host "=== GlyphDeck Release Build ==="
 
-Write-Host "=== Building Go backend ==="
-go build -o bin/glyphdeck.exe ./cmd/glyphdeck
-if ($LASTEXITCODE -ne 0) { throw "Go build failed" }
-
-Write-Host "=== Building frontend ==="
-Push-Location web
-npm install
-npm run build
-Pop-Location
+# Build frontend
+Write-Host "[1/2] Building frontend..."
+Set-Location (Join-Path $repoRoot "web")
+& cmd.exe /c "npm.cmd run build" 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
+Write-Host "[frontend] OK"
+
+# Build Go binary
+Write-Host "[2/2] Building Go binary..."
+Set-Location $repoRoot
+$outDir = Join-Path $repoRoot "dist"
+New-Item -ItemType Directory -Path $outDir -Force | Out-Null
+go build -o "$outDir\glyphdeck.exe" .\cmd\glyphdeck\
+if ($LASTEXITCODE -ne 0) { throw "Go build failed" }
+Write-Host "[binary] dist\glyphdeck.exe"
 
 Write-Host "=== Build complete ==="
-Write-Host "Backend: bin/glyphdeck.exe"
-Write-Host "Frontend: web/dist/"
+Write-Host "Run: .\dist\glyphdeck.exe"
+Write-Host "Then open: http://127.0.0.1:8756"
