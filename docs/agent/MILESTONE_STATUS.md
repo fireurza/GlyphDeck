@@ -62,10 +62,12 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-Phase 2 — MVP / v0.1.0 planning
+MVP Milestone 11 — SQLite persistence
 ```
 
-Milestone 10 accepted (POC hardening: browser refresh, problems tab, graceful shutdown, README docs).
+MVP v0.1.0 planning complete. See docs/agent/MVP_V0_1_0_PLAN.md.
+
+M10 hardening delivered: browser refresh preserves project state; graceful shutdown stops app-owned servers/terminals; Problems tab tracks app errors; README complete.
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -169,7 +171,6 @@ MVP: Go binary serving embedded React assets
 Do not implement these until their milestone:
 
 ```text
-SQLite
 Auth
 Tailscale/LAN binding
 Team mode
