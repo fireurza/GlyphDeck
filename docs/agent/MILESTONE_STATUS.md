@@ -43,6 +43,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 3.5 — Validation Harness Hardening | Accepted | c8ba09d | data-testid selectors, dev/test endpoints, validation scripts, M3 smoke re-validated |
 | Milestone 4 — EventBridge streaming | Accepted | 6fe2911 | Real OpenCode /event SSE parser fix; live streaming proven end-to-end (backend probe + browser smoke, exact streamed text); connected status real; fresh-session selection by id |
 | Milestone 5 — Agent Terminal | Accepted | 732e22b | Fixed Stop Server/session-list flex-collapse overlap (root-caused via DOM measurement); read-only Agent Terminal fed live from existing M4 event stream, bounded 300-row client log, category filters, Clear; no new backend endpoint needed (documented in README) |
+| Milestone 6 — Usage tab | Accepted | <commit-hash> | Backend usage aggregation from OpenCode assistant messages, dedicated GET endpoint, frontend Usage panel with provider/model/token/cost display, error/loading/empty states, Refresh button |
 
 ---
 

@@ -45,6 +45,51 @@ Milestone 5 adds a read-only Agent Terminal view in the bottom panel, populated 
 - Basic category filters (All / Tool / Shell / Message / Permission / System) and a Clear button are available.
 - **User PTY terminal is not implemented yet.** The bottom panel's "Terminal" tab remains a placeholder; interactive shell access is out of scope until a later milestone.
 
+## Milestone 6 — Usage Tab
+
+Milestone 6 adds a functional Usage tab in the right panel. Usage data is aggregated from OpenCode assistant messages by the backend and served through a dedicated endpoint.
+
+**Usage data source:**
+
+- `GET /session/{id}/message` — the backend walks assistant messages in reverse to find the last one with token/cost data.
+- Assistant messages carry `info.providerID`, `info.modelID`, `info.agent`, `info.mode`, `info.cost`, and `info.tokens` (total, input, output, reasoning, cache read/write).
+
+**Usage endpoint:**
+
+```
+GET /api/projects/{projectId}/sessions/{sessionId}/usage
+```
+
+Response shape matches the OpenCode assistant message info fields:
+```json
+{
+  "providerID": "deepseek",
+  "modelID": "deepseek-v4-pro",
+  "agent": "build",
+  "mode": "build",
+  "cost": 0.009337275,
+  "tokens": {
+    "total": 23329,
+    "input": 21369,
+    "output": 8,
+    "reasoning": 32,
+    "cache": { "read": 1920, "write": 0 }
+  },
+  "messageCount": 2
+}
+```
+
+**Usage tab behavior:**
+
+- Shows empty state when no session is selected.
+- Shows loading state while fetching.
+- Shows error state if usage fetch fails.
+- Displays provider, model, agent, mode, token breakdown, cost, and message count.
+- Missing fields render as an em-dash (`—`).
+- Manual Refresh button available.
+- Cost is shown as USD with up to 6 decimal places for small values.
+- Reasoning tokens row is only shown when non-zero.
+
 ## Prerequisites
 
 - [Go](https://go.dev/dl/) (1.23+)
@@ -103,6 +148,7 @@ OpenCode servers bind to `127.0.0.1` only. Ports are allocated dynamically. Heal
 - `GET /api/projects/{projectId}/sessions/{sessionId}` — get session details.
 - `GET /api/projects/{projectId}/sessions/{sessionId}/messages` — list messages in a session.
 - `POST /api/projects/{projectId}/sessions/{sessionId}/prompt` — send a non-streaming prompt and receive the response.
+- `GET /api/projects/{projectId}/sessions/{sessionId}/usage` — get aggregated token usage and cost for a session.
 
 The project's OpenCode server must be in `ready` state. Session/message data is sourced from the OpenCode server, not persisted in GlyphDeck.
 
@@ -135,14 +181,18 @@ Working directory: project root
 12. Confirm the assistant response appears in the transcript.
 13. Open the **Agent Terminal** tab in the bottom panel and confirm live event rows appear for the active session (session/message updates, streamed text, tool/shell events if the prompt triggered any).
 14. Click Clear in the Agent Terminal and confirm the visible rows are removed.
-15. Click Stop Server (no force-click needed).
-16. Confirm server stops.
+15. Open the **Usage** tab in the right panel and confirm provider/model/token/cost data appears.
+16. Click Refresh in the Usage tab and confirm the panel does not error.
+17. Click Stop Server (no force-click needed).
+18. Confirm server stops.
 
 ## Known Limitations
 
 - User-controlled terminal (PTY + xterm.js) is not implemented. The bottom panel's Terminal tab is a placeholder.
 - Agent Terminal shows only live activity from the moment it starts listening; it does not backfill history from before a session was selected.
-- Permissions approval popup, Usage tab aggregation, and Review tab data are not implemented yet (later milestones).
+- Usage tab shows data from the latest assistant message only; it does not show per-message or cumulative session totals.
+- Usage data availability depends on OpenCode's assistant message shape. If OpenCode omits token/cost fields, the backend returns what it can and the UI shows em-dashes for missing values.
+- Permissions approval popup and Review tab data are not implemented yet (later milestones).
 
 ## Validation Commands
 

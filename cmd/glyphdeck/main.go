@@ -10,6 +10,7 @@ import (
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/servers"
 	"glyphdeck/internal/sessions"
+	"glyphdeck/internal/usage"
 	"log"
 	"net"
 	"net/http"
@@ -45,6 +46,11 @@ func main() {
 	sessionProjectAdapter := &sessionProjectResolverAdapter{registry: registry}
 	sessionsMgr := sessions.NewManager(manager, sessionProjectAdapter)
 	sessions.RegisterHandlers(mux, sessionsMgr)
+
+	// Usage.
+	usageProjectAdapter := &usageProjectResolverAdapter{registry: registry}
+	usageMgr := usage.NewManager(manager, usageProjectAdapter)
+	usage.RegisterHandlers(mux, usageMgr)
 
 	// Events hub — bridges OpenCode SSE to browser clients.
 	eventsHub := events.NewHub()
@@ -136,4 +142,20 @@ func (a *sessionProjectResolverAdapter) Get(ctx context.Context, id string) (ses
 		return sessions.ProjectInfo{}, err
 	}
 	return sessions.ProjectInfo{ID: project.ID, Path: project.Path}, nil
+}
+
+// usageProjectResolverAdapter adapts the projects.Registry to usage.ProjectResolver.
+type usageProjectResolverAdapter struct {
+	registry *projects.Registry
+}
+
+func (a *usageProjectResolverAdapter) Get(ctx context.Context, id string) (usage.ProjectInfo, error) {
+	project, err := a.registry.Get(ctx, id)
+	if errors.Is(err, projects.ErrProjectNotFound) {
+		return usage.ProjectInfo{}, usage.ErrProjectNotFound
+	}
+	if err != nil {
+		return usage.ProjectInfo{}, err
+	}
+	return usage.ProjectInfo{ID: project.ID, Path: project.Path}, nil
 }
