@@ -1,8 +1,8 @@
-# GlyphDeck validation harness — start dev servers (M6 recovery)
+# GlyphDeck validation harness - start dev servers (M6 recovery)
 $ErrorActionPreference = "Stop"
 
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$repoRoot = Resolve-Path (Join-Path $scriptDir "..\..\..\..")
+$repoRoot = Resolve-Path (Join-Path $scriptDir "..\..")
 $valDir = Join-Path $repoRoot ".glyphdeck\validation\m6_recovery"
 $logDir = Join-Path $valDir "logs"
 $pidDir = Join-Path $valDir "pids"
@@ -17,6 +17,31 @@ $frontendPort = "5173"
 
 Write-Host "=== GlyphDeck M6 Recovery — Start Dev ==="
 
+# ---- Pre-cleanup: kill leftover processes on GlyphDeck ports ----
+# Remove stale project JSON that triggers OpenCode server on startup.
+Remove-Item -Path (Join-Path $repoRoot ".glyphdeck\projects.json") -Force -ErrorAction SilentlyContinue
+Write-Host "[cleanup] Removed stale projects.json"
+
+# Try the dev reset endpoint first to stop any app-owned OpenCode servers.
+try {
+    $null = Invoke-WebRequest -Uri "http://127.0.0.1:${backendPort}/api/dev/reset-validation-state" -Method POST -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+    Write-Host "[cleanup] Dev reset OK on existing backend"
+    Start-Sleep -Milliseconds 500
+} catch { Write-Host "[cleanup] No existing backend to reset" }
+
+foreach ($port in @($backendPort, $frontendPort)) {
+    $existing = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($existing) {
+        try {
+            Stop-Process -Id $existing.OwningProcess -Force -ErrorAction Stop
+            Write-Host "[cleanup] Killed PID $($existing.OwningProcess) on port $port"
+            Start-Sleep -Milliseconds 500
+        } catch {
+            Write-Host "[cleanup] Could not stop PID $($existing.OwningProcess) on port $port"
+        }
+    }
+}
+
 # Start backend
 Write-Host "[backend] Starting..."
 $backendJob = Start-Job -Name "glyphdeck-m6r-backend" -ScriptBlock {
@@ -24,7 +49,7 @@ $backendJob = Start-Job -Name "glyphdeck-m6r-backend" -ScriptBlock {
     $env:GLYPHDECK_PORT = $Port
     if ($env:GLYPHDECK_DEV_TOOLS -ne "1") { Remove-Item Env:\GLYPHDECK_DEV_TOOLS -ErrorAction SilentlyContinue }
     Set-Location -LiteralPath $Root
-    & go run ./cmd/glyphdeck *>> $Log 2>&1
+    & go run ./cmd/glyphdeck >> $Log 2>&1
 } -ArgumentList $repoRoot, $backendLog, $backendPort
 
 $backendPID = $null
@@ -51,7 +76,7 @@ Write-Host "[frontend] Starting..."
 $frontendJob = Start-Job -Name "glyphdeck-m6r-frontend" -ScriptBlock {
     param($WebDir, $Log)
     Set-Location -LiteralPath $WebDir
-    & npm run dev *>> $Log 2>&1
+    & npm run dev >> $Log 2>&1
 } -ArgumentList (Join-Path $repoRoot "web"), $frontendLog
 
 $frontendPID = $null
