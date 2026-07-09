@@ -237,6 +237,30 @@ function LeftPanel({ initialProjectId, onSelectProject, onSelectSession }: LeftP
     selectedProjectId != null &&
     serverStatuses[selectedProjectId]?.status === 'ready'
 
+  // Auto-load sessions when selected project becomes ready
+  // (covers browser refresh, server start, and manual selection).
+  useEffect(() => {
+    if (!selectedProjectReady || !selectedProjectId) return
+
+    const controller = new AbortController()
+    setSessionsLoading(true)
+    setSessionError(null)
+
+    fetchSessions(selectedProjectId, controller.signal)
+      .then((fetched) => {
+        if (!controller.signal.aborted) setSessions(fetched)
+      })
+      .catch((err) => {
+        if (!controller.signal.aborted)
+          setSessionError(err instanceof Error ? err.message : 'Could not load sessions.')
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setSessionsLoading(false)
+      })
+
+    return () => controller.abort()
+  }, [selectedProjectId, selectedProjectReady])
+
   return (
     <aside className="left-panel">
       <div className="panel-header">Projects</div>
