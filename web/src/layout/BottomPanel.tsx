@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import ProblemsPanel from './ProblemsPanel'
 import AgentTerminal from './AgentTerminal'
 import UserTerminal from './UserTerminal'
 import type { EventStreamStatus, StreamEvent } from '../api/events'
@@ -6,7 +7,7 @@ import type { EventStreamStatus, StreamEvent } from '../api/events'
 const TABS = ['Problems', 'Agent Terminal', 'Terminal'] as const
 
 const TAB_TEST_IDS: Record<string, string> = {
-  Problems: 'problems-tab',
+  Problems: 'bottom-problems-tab',
   'Agent Terminal': 'bottom-agent-terminal-tab',
   Terminal: 'bottom-terminal-tab',
 }
@@ -28,6 +29,8 @@ function BottomPanel({
 
   function renderPanel() {
     switch (activeTab) {
+      case 'Problems':
+        return <ProblemsPanel />
       case 'Agent Terminal':
         return (
           <AgentTerminal
