@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"time"
 )
 
 // Handler serves terminal HTTP endpoints and SSE streams.
@@ -51,7 +52,6 @@ func (h *Handler) startTerminal(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) streamTerminal(w http.ResponseWriter, r *http.Request) {
 	terminalID := r.PathValue("terminalId")
 
-	// Verify terminal exists.
 	status, err := h.manager.Status(terminalID)
 	if err != nil || !status.Running {
 		writeError(w, http.StatusNotFound, "terminal_not_found", "Terminal not found or not running.")
@@ -75,29 +75,83 @@ func (h *Handler) streamTerminal(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "data: %s\n\n", statusJSON)
 	flusher.Flush()
 
-	buf := make([]byte, 4096)
+	// Use a goroutine to read stdout and push to a channel, so we can
+	// flush frequently even when stdout is idle.
+	ch := make(chan []byte, 32)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		defer func() { close(ch) }()
+
+		reader, err := h.manager.NewReader(terminalID)
+		if err != nil {
+			return
+		}
+
+		buf := make([]byte, 4096)
+		for {
+			select {
+			case <-r.Context().Done():
+				return
+			default:
+			}
+			n, readErr := reader.Read(buf)
+			if n > 0 {
+				data := make([]byte, n)
+				copy(data, buf[:n])
+				select {
+				case ch <- data:
+				case <-r.Context().Done():
+					return
+				}
+			}
+			if readErr != nil {
+				if readErr == io.EOF {
+					select {
+					case ch <- nil: // signal EOF
+					case <-r.Context().Done():
+					}
+				} else {
+					log.Printf("terminal stream read error for %s: %v", terminalID, readErr)
+				}
+				return
+			}
+		}
+	}()
+
+	ticker := time.NewTicker(100 * time.Millisecond)
+	defer ticker.Stop()
+
+	var accumulator []byte
+	flushAccumulator := func() {
+		if len(accumulator) == 0 {
+			return
+		}
+		fmt.Fprintf(w, "data: %s\n\n", escapeSSE(accumulator))
+		flusher.Flush()
+		accumulator = accumulator[:0]
+	}
+
 	for {
 		select {
 		case <-r.Context().Done():
 			return
-		default:
-		}
-
-		n, err := h.manager.Read(terminalID, buf)
-		if n > 0 {
-			// Escape newlines for SSE data lines.
-			output := buf[:n]
-			fmt.Fprintf(w, "data: %s\n\n", escapeSSE(output))
-			flusher.Flush()
-		}
-		if err != nil {
-			if err == io.EOF {
-				fmt.Fprintf(w, "event: closed\ndata: terminal closed\n\n")
-			} else {
-				log.Printf("terminal stream read error for %s: %v", terminalID, err)
+		case data, ok := <-ch:
+			if data != nil {
+				accumulator = append(accumulator, data...)
+				// Flush on each chunk — the goroutine reads whenever
+				// stdout has data, so flushing immediately is responsive.
+				flushAccumulator()
 			}
-			flusher.Flush()
-			return
+			if !ok || data == nil {
+				// EOF or channel closed.
+				flushAccumulator()
+				fmt.Fprintf(w, "event: closed\ndata: terminal closed\n\n")
+				flusher.Flush()
+				return
+			}
+		case <-ticker.C:
+			flushAccumulator()
 		}
 	}
 }
