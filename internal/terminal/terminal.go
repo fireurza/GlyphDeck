@@ -168,16 +168,15 @@ func (m *Manager) Write(id string, data []byte) error {
 	return err
 }
 
-// Read reads output from the terminal.
-func (m *Manager) Read(id string, buf []byte) (int, error) {
+// NewReader returns an io.Reader for the terminal's stdout.
+func (m *Manager) NewReader(id string) (io.Reader, error) {
 	m.mu.RLock()
 	term, ok := m.terminals[id]
 	m.mu.RUnlock()
 	if !ok {
-		return 0, fmt.Errorf("terminal %s not found", id)
+		return nil, fmt.Errorf("terminal %s not found", id)
 	}
-
-	return term.stdout.Read(buf)
+	return term.stdout, nil
 }
 
 // Resize changes the terminal window size (no-op for pipe-based terminals).
