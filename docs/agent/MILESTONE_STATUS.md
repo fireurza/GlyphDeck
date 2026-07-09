@@ -50,8 +50,9 @@ Desktop Docker Sandbox mode: not used
 | Milestone 10 — POC hardening | Accepted | 96715c5 | Browser refresh preserves project state (localStorage); graceful shutdown stops app-owned servers/terminals; Problems tab with bounded ring buffer; terminal output timer-based flush; complete README docs |
 | Milestone 11 — SQLite persistence | Accepted | 09c23ee | Project registry backed by SQLite (modernc.org/sqlite, pure Go); JSON migration on first startup; project data survives backend restart; all M10 regressions clean |
 | Milestone 12 — State model cleanup | Accepted | a905eb6 | Sessions auto-load when project becomes ready (browser refresh, server start); event stream shows Offline not Error after intentional stop; session creation works after refresh; validation corrected (vision review + Notepad/npx.ps1 guard) |
-| Milestone 13 — Settings + embed + release | Accepted | 137cee6 | Settings page (SQLite-backed, save persists); Go binary serves frontend in release mode; cross-platform build script; all regressions clean |
+| Milestone 13 — Settings + embed + release | Accepted | 137cee6 | Settings page (SQLite-backed, save persists); release build scripts added. The former working-directory frontend serving is corrected by the v0.1.0 candidate work. |
 | Milestone 14 — Terminal reliability | Accepted | 6e46911 | Terminal SSE streaming rewritten (goroutine + channel + per-chunk flush + 100ms ticker); marker output reliably visible; all regressions clean; M14 vision review PASS |
+| v0.1.0 — MVP release candidate | Accepted | 6778e4a | Embedded release binary, activity-rail Settings modal, three-tab dock, isolated release smoke, code review, and manual vision review pass |
 
 ---
 
@@ -63,10 +64,10 @@ Desktop Docker Sandbox mode: not used
 
 ## Current Next Step
 
-The next milestone is:
+The release candidate is accepted. The next release action, when separately authorized, is:
 
 ```text
-v0.1.0 — MVP release candidate
+Create the v0.1.0 tag and release notes.
 ```
 
 M14 accepted (terminal SSE streaming fix — marker output reliably visible).
@@ -76,6 +77,17 @@ The existing 16 screenshots under `.glyphdeck/validation/m14/screenshots/` and
 their manifest were reviewed for the Milestone 14 label, terminal marker/output,
 terminal open/close states, Review/Usage/Agent Terminal/Terminal/Problems/Settings
 panel integrity, layout clipping, and unexpected error banners.
+
+v0.1.0 release-candidate acceptance (2026-07-09, feature commit `6778e4a`): the embedded release binary
+passed the isolated `mvp` browser smoke with 17 fresh screenshots and a manifest
+under `.glyphdeck/validation/mvp/screenshots/`. The activity-rail Settings trigger
+opens a centered modal above the dock; SQLite-backed Settings persistence, close/
+Escape focus return, project/server/session lifecycle, panels, terminal marker,
+and shutdown were asserted. Vision/manual review PASS. The primary image viewer
+intermittently rendered partial frames for unchanged PNGs, so all source frames
+were also reviewed through a stable local decode/re-encode path under
+`.glyphdeck/validation/mvp/vision/`; the fresh source PNGs and manifest remain
+the acceptance evidence.
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -87,10 +99,10 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 14 accepted; bump to v0.1.0 when release prep begins):
+Current expected label (v0.1.0 release candidate):
 
 ```text
-Milestone 14
+v0.1.0
 ```
 
 Rules:

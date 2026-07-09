@@ -10,7 +10,7 @@
 | Phase | Phase 2 — MVP / v0.1.0 |
 | Created | 2026-07-09 |
 | Based on | GlyphDeck Roadmap, POC Implementation Plan, Technical Architecture |
-| Accepted baseline | M0 through M14; v0.1.0 release candidate validated |
+| Accepted baseline | M0 through M14; v0.1.0 release candidate accepted at `6778e4a` |
 
 ---
 
@@ -88,7 +88,7 @@ open/close states, panel integrity, clipping, and unexpected error banners.
 
 ### 3.2 v0.1.0 Release-Candidate Evidence
 
-The release-candidate build was validated from the embedded `dist/glyphdeck.exe`
+The release candidate was accepted at `6778e4a` after validation from the embedded `dist/glyphdeck.exe`
 binary with isolated app data. The `mvp` smoke passed on 2026-07-09 with 17
 fresh screenshots and a manifest under `.glyphdeck/validation/mvp/screenshots/`.
 It verifies the v0.1.0 label, SQLite-backed Settings persistence, project/server/

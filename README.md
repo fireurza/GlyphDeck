@@ -27,7 +27,7 @@ GlyphDeck is a local-first web workspace for managing projects, detecting OpenCo
 
 See [docs/agent/MVP_V0_1_0_PLAN.md](docs/agent/MVP_V0_1_0_PLAN.md) for the full MVP plan.
 
-The release candidate serves the React build from `glyphdeck.exe`, uses SQLite for
+The accepted release candidate (`6778e4a`) serves the React build from `glyphdeck.exe`, uses SQLite for
 projects and Settings, and has a fresh isolated MVP smoke suite. Settings is
 opened from the activity rail as a modal overlay; the bottom dock contains only
 Problems, Agent Terminal, and Terminal. Tagging and release notes remain a
