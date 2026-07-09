@@ -42,6 +42,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 3 — Sessions and prompt loop | Accepted | c8ba09d | M3 smoke re-validated in M3.5 harness |
 | Milestone 3.5 — Validation Harness Hardening | Accepted | c8ba09d | data-testid selectors, dev/test endpoints, validation scripts, M3 smoke re-validated |
 | Milestone 4 — EventBridge streaming | Accepted | 6fe2911 | Real OpenCode /event SSE parser fix; live streaming proven end-to-end (backend probe + browser smoke, exact streamed text); connected status real; fresh-session selection by id |
+| Milestone 5 — Agent Terminal | Accepted | (fill after commit) | Fixed Stop Server/session-list flex-collapse overlap (root-caused via DOM measurement); read-only Agent Terminal fed live from existing M4 event stream, bounded 300-row client log, category filters, Clear; no new backend endpoint needed (documented in README) |
 
 ---
 
@@ -56,15 +57,15 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-Milestone 5 — Agent Terminal
+Milestone 6 — Usage tab
 ```
 
-Milestone 4 accepted (EventBridge streaming validated). Milestone 5 may now begin.
+Milestone 5 accepted (Agent Terminal + Stop Server/session-list layout fix
+validated). Milestone 6 may now begin.
 
-Known open UI defect carried forward (not an M4 streaming issue): the Stop
-Server button is intercepted by the session list (pointer-events overlap).
-Cleanup uses the app-owned `/api/dev/stop-all-app-owned-servers` endpoint until
-the layout is fixed.
+The Stop Server/session-list overlap carried forward from Milestone 4 is
+fixed and verified (root-caused via DOM measurement, re-verified in the M5
+smoke with a normal, non-force click).
 
 ---
 
@@ -72,10 +73,10 @@ the layout is fixed.
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 4 accepted; bump to Milestone 5 when M5 work begins):
+Current expected label (Milestone 5 accepted; bump to Milestone 6 when M6 work begins):
 
 ```text
-Milestone 4
+Milestone 5
 ```
 
 Rules:
@@ -164,7 +165,6 @@ MVP: Go binary serving embedded React assets
 Do not implement these until their milestone:
 
 ```text
-Agent Terminal tool history
 Usage tab aggregation
 Review tab data
 Permissions popup
