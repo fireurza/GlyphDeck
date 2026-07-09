@@ -49,5 +49,8 @@ coverage/
 # Go workspace
 go.work
 
+# CortexKit
+.cortexkit/
+
 # OS
 Desktop.ini

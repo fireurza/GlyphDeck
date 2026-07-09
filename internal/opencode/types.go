@@ -44,8 +44,29 @@ type Message struct {
 
 // MessageInfo carries metadata about a message.
 type MessageInfo struct {
-	ID   string `json:"id"`
-	Role string `json:"role"`
+	ID         string      `json:"id"`
+	Role       string      `json:"role"`
+	ProviderID string      `json:"providerID,omitempty"`
+	ModelID    string      `json:"modelID,omitempty"`
+	Agent      string      `json:"agent,omitempty"`
+	Mode       string      `json:"mode,omitempty"`
+	Cost       float64     `json:"cost,omitempty"`
+	Tokens     TokenUsage  `json:"tokens,omitempty"`
+}
+
+// TokenUsage captures token breakdown from assistant messages.
+type TokenUsage struct {
+	Total     int        `json:"total"`
+	Input     int        `json:"input"`
+	Output    int        `json:"output"`
+	Reasoning int        `json:"reasoning"`
+	Cache     CacheUsage `json:"cache,omitempty"`
+}
+
+// CacheUsage captures cache read/write token counts.
+type CacheUsage struct {
+	Read  int `json:"read"`
+	Write int `json:"write"`
 }
 
 // Part holds a piece of message content.

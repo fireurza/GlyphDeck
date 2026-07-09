@@ -41,7 +41,10 @@ function App() {
           eventStreamStatus={eventStreamStatus}
           latestEvent={latestEvent}
         />
-        <RightPanel />
+        <RightPanel
+          selectedProjectId={selectedProjectId}
+          selectedSessionId={selectedSessionId}
+        />
       </div>
       <BottomPanel
         selectedProjectId={selectedProjectId}
