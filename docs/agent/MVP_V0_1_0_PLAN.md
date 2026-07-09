@@ -73,6 +73,14 @@ All evidence captured under `.glyphdeck/validation/m10/`.
 | Vision review | Batch 1 PASS (7/7), Batch 2 PASS (7/7) |
 | Screenshots | 14 captured |
 
+### 3.1 Post-M14 Validation Correction
+
+Milestone 14's terminal SSE reliability correction was accepted at `6e46911`.
+The validation record is completed with **M14 vision review PASS**: the existing
+16 screenshots and manifest at `.glyphdeck/validation/m14/screenshots/` were
+reviewed for the Milestone 14 label, visible terminal marker/output, terminal
+open/close states, panel integrity, clipping, and unexpected error banners.
+
 ---
 
 ## 4. Known Technical Caveats (Carried Forward from POC)

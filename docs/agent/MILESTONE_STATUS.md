@@ -51,7 +51,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 11 — SQLite persistence | Accepted | 09c23ee | Project registry backed by SQLite (modernc.org/sqlite, pure Go); JSON migration on first startup; project data survives backend restart; all M10 regressions clean |
 | Milestone 12 — State model cleanup | Accepted | a905eb6 | Sessions auto-load when project becomes ready (browser refresh, server start); event stream shows Offline not Error after intentional stop; session creation works after refresh; validation corrected (vision review + Notepad/npx.ps1 guard) |
 | Milestone 13 — Settings + embed + release | Accepted | 137cee6 | Settings page (SQLite-backed, save persists); Go binary serves frontend in release mode; cross-platform build script; all regressions clean |
-| Milestone 14 — Terminal reliability | Accepted | 6e46911 | Terminal SSE streaming rewritten (goroutine + channel + per-chunk flush + 100ms ticker); marker output reliably visible; all regressions clean |
+| Milestone 14 — Terminal reliability | Accepted | 6e46911 | Terminal SSE streaming rewritten (goroutine + channel + per-chunk flush + 100ms ticker); marker output reliably visible; all regressions clean; M14 vision review PASS |
 
 ---
 
@@ -70,6 +70,12 @@ v0.1.0 — MVP release candidate
 ```
 
 M14 accepted (terminal SSE streaming fix — marker output reliably visible).
+
+Post-M14 validation correction (2026-07-09): **M14 vision review PASS**.
+The existing 16 screenshots under `.glyphdeck/validation/m14/screenshots/` and
+their manifest were reviewed for the Milestone 14 label, terminal marker/output,
+terminal open/close states, Review/Usage/Agent Terminal/Terminal/Problems/Settings
+panel integrity, layout clipping, and unexpected error banners.
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
