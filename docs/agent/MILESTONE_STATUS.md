@@ -41,7 +41,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 2 — OpenCode server manager | Accepted | f64f0a8 | OpenCode detection, start/stop server, ready/version UI |
 | Milestone 3 — Sessions and prompt loop | Accepted | c8ba09d | M3 smoke re-validated in M3.5 harness |
 | Milestone 3.5 — Validation Harness Hardening | Accepted | c8ba09d | data-testid selectors, dev/test endpoints, validation scripts, M3 smoke re-validated |
-| Milestone 4 — EventBridge streaming | Accepted | (fill after commit) | Real OpenCode /event SSE parser fix; live streaming proven end-to-end (backend probe + browser smoke, exact streamed text); connected status real; fresh-session selection by id |
+| Milestone 4 — EventBridge streaming | Accepted | 6fe2911 | Real OpenCode /event SSE parser fix; live streaming proven end-to-end (backend probe + browser smoke, exact streamed text); connected status real; fresh-session selection by id |
 
 ---
 
