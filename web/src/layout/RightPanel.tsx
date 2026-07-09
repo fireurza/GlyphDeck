@@ -1,10 +1,11 @@
 import { useState } from 'react'
+import ReviewPanel from './ReviewPanel'
 import UsagePanel from './UsagePanel'
 
 const TABS = ['Review', 'Usage', 'Tasks', 'Agents'] as const
 
 const TAB_TEST_IDS: Record<string, string> = {
-  Review: 'review-tab',
+  Review: 'right-review-tab',
   Usage: 'right-usage-tab',
   Tasks: 'tasks-tab',
   Agents: 'agents-tab',
@@ -20,6 +21,13 @@ function RightPanel({ selectedProjectId, selectedSessionId }: RightPanelProps) {
 
   function renderPanel() {
     switch (activeTab) {
+      case 'Review':
+        return (
+          <ReviewPanel
+            selectedProjectId={selectedProjectId}
+            selectedSessionId={selectedSessionId}
+          />
+        )
       case 'Usage':
         return (
           <UsagePanel
@@ -27,7 +35,6 @@ function RightPanel({ selectedProjectId, selectedSessionId }: RightPanelProps) {
             selectedSessionId={selectedSessionId}
           />
         )
-      case 'Review':
       case 'Tasks':
       case 'Agents':
       default:

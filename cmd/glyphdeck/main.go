@@ -8,6 +8,7 @@ import (
 	"glyphdeck/internal/events"
 	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/projects"
+	"glyphdeck/internal/review"
 	"glyphdeck/internal/servers"
 	"glyphdeck/internal/sessions"
 	"glyphdeck/internal/usage"
@@ -51,6 +52,11 @@ func main() {
 	usageProjectAdapter := &usageProjectResolverAdapter{registry: registry}
 	usageMgr := usage.NewManager(manager, usageProjectAdapter)
 	usage.RegisterHandlers(mux, usageMgr)
+
+	// Review.
+	reviewProjectAdapter := &reviewProjectResolverAdapter{registry: registry}
+	reviewMgr := review.NewManager(manager, reviewProjectAdapter)
+	review.RegisterHandlers(mux, reviewMgr)
 
 	// Events hub — bridges OpenCode SSE to browser clients.
 	eventsHub := events.NewHub()
@@ -158,4 +164,17 @@ func (a *usageProjectResolverAdapter) Get(ctx context.Context, id string) (usage
 		return usage.ProjectInfo{}, err
 	}
 	return usage.ProjectInfo{ID: project.ID, Path: project.Path}, nil
+}
+
+// reviewProjectResolverAdapter adapts the projects.Registry to review.ProjectResolver.
+type reviewProjectResolverAdapter struct {
+	registry *projects.Registry
+}
+
+func (a *reviewProjectResolverAdapter) Get(ctx context.Context, id string) (*projects.Project, error) {
+	project, err := a.registry.Get(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	return &project, nil
 }
