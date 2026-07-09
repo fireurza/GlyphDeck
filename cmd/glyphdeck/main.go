@@ -13,6 +13,7 @@ import (
 	"glyphdeck/internal/review"
 	"glyphdeck/internal/servers"
 	"glyphdeck/internal/sessions"
+	"glyphdeck/internal/terminal"
 	"glyphdeck/internal/usage"
 	"log"
 	"net"
@@ -64,6 +65,12 @@ func main() {
 	permissionsProjectAdapter := &permissionsProjectResolverAdapter{registry: registry}
 	permissionsMgr := permissions.NewManager(manager, permissionsProjectAdapter)
 	permissions.RegisterHandlers(mux, permissionsMgr)
+
+	// User Terminal.
+	terminalProjectAdapter := &terminalProjectResolverAdapter{registry: registry}
+	terminalMgr := terminal.NewManager(terminalProjectAdapter)
+	terminal.RegisterHandlers(mux, terminalMgr)
+	defer terminalMgr.CloseAll()
 
 	// Events hub — bridges OpenCode SSE to browser clients.
 	eventsHub := events.NewHub()
@@ -200,4 +207,17 @@ func (a *permissionsProjectResolverAdapter) Get(ctx context.Context, id string) 
 		return permissions.ProjectInfo{}, err
 	}
 	return permissions.ProjectInfo{ID: project.ID, Path: project.Path}, nil
+}
+
+// terminalProjectResolverAdapter adapts the projects.Registry to terminal.ProjectResolver.
+type terminalProjectResolverAdapter struct {
+	registry *projects.Registry
+}
+
+func (a *terminalProjectResolverAdapter) GetPath(ctx context.Context, id string) (string, error) {
+	project, err := a.registry.Get(ctx, id)
+	if err != nil {
+		return "", err
+	}
+	return project.Path, nil
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import AgentTerminal from './AgentTerminal'
+import UserTerminal from './UserTerminal'
 import type { EventStreamStatus, StreamEvent } from '../api/events'
 
 const TABS = ['Problems', 'Agent Terminal', 'Terminal'] as const
@@ -7,7 +8,7 @@ const TABS = ['Problems', 'Agent Terminal', 'Terminal'] as const
 const TAB_TEST_IDS: Record<string, string> = {
   Problems: 'problems-tab',
   'Agent Terminal': 'bottom-agent-terminal-tab',
-  Terminal: 'terminal-tab',
+  Terminal: 'bottom-terminal-tab',
 }
 
 interface BottomPanelProps {
@@ -25,6 +26,28 @@ function BottomPanel({
 }: BottomPanelProps) {
   const [activeTab, setActiveTab] = useState<string>('Problems')
 
+  function renderPanel() {
+    switch (activeTab) {
+      case 'Agent Terminal':
+        return (
+          <AgentTerminal
+            selectedProjectId={selectedProjectId}
+            selectedSessionId={selectedSessionId}
+            eventStreamStatus={eventStreamStatus}
+            latestEvent={latestEvent}
+          />
+        )
+      case 'Terminal':
+        return <UserTerminal selectedProjectId={selectedProjectId} />
+      default:
+        return (
+          <div className="panel-body panel-placeholder">
+            <p>{activeTab} — no issues detected.</p>
+          </div>
+        )
+    }
+  }
+
   return (
     <footer className="bottom-panel">
       <div className="tab-bar">
@@ -39,19 +62,7 @@ function BottomPanel({
           </button>
         ))}
       </div>
-
-      {activeTab === 'Agent Terminal' ? (
-        <AgentTerminal
-          selectedProjectId={selectedProjectId}
-          selectedSessionId={selectedSessionId}
-          eventStreamStatus={eventStreamStatus}
-          latestEvent={latestEvent}
-        />
-      ) : (
-        <div className="panel-body panel-placeholder">
-          <p>{activeTab} — no issues detected.</p>
-        </div>
-      )}
+      {renderPanel()}
     </footer>
   )
 }
