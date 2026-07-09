@@ -173,3 +173,22 @@ func (m Message) toPromptResult() PromptResult {
 		Parts:     m.Parts,
 	}
 }
+
+// ListPermissions returns all pending permission requests.
+func (c *Client) ListPermissions(ctx context.Context) ([]PermissionRequest, error) {
+	var requests []PermissionRequest
+	if err := c.doJSON(ctx, http.MethodGet, "/permission", nil, &requests); err != nil {
+		return nil, err
+	}
+	return requests, nil
+}
+
+// ReplyPermission replies to a permission request.
+func (c *Client) ReplyPermission(ctx context.Context, requestID string, reply PermissionReply) error {
+	data, err := json.Marshal(reply)
+	if err != nil {
+		return fmt.Errorf("marshal permission reply: %w", err)
+	}
+	path := fmt.Sprintf("/permission/%s/reply", requestID)
+	return c.doJSON(ctx, http.MethodPost, path, data, nil)
+}

@@ -82,3 +82,30 @@ type PromptResult struct {
 	Text      string
 	Parts     []Part
 }
+
+// PermissionRequest represents a pending permission request from OpenCode.
+type PermissionRequest struct {
+	ID         string            `json:"id"`
+	SessionID  string            `json:"sessionID"`
+	Permission string            `json:"permission"`
+	Patterns   []string          `json:"patterns"`
+	Metadata   PermissionMeta    `json:"metadata"`
+	Always     []string          `json:"always"`
+	Tool       PermissionToolRef `json:"tool"`
+}
+
+// PermissionMeta carries the command/binary context of a permission request.
+type PermissionMeta struct {
+	Command string `json:"command"`
+}
+
+// PermissionToolRef identifies the tool call that triggered the permission.
+type PermissionToolRef struct {
+	MessageID string `json:"messageID"`
+	CallID    string `json:"callID"`
+}
+
+// PermissionReply is the body sent to reply to a permission request.
+type PermissionReply struct {
+	Reply string `json:"reply"`
+}

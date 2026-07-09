@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"glyphdeck/internal/devtools"
 	"glyphdeck/internal/events"
 	"glyphdeck/internal/opencode"
+	"glyphdeck/internal/permissions"
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/review"
 	"glyphdeck/internal/servers"
@@ -57,6 +59,11 @@ func main() {
 	reviewProjectAdapter := &reviewProjectResolverAdapter{registry: registry}
 	reviewMgr := review.NewManager(manager, reviewProjectAdapter)
 	review.RegisterHandlers(mux, reviewMgr)
+
+	// Permissions.
+	permissionsProjectAdapter := &permissionsProjectResolverAdapter{registry: registry}
+	permissionsMgr := permissions.NewManager(manager, permissionsProjectAdapter)
+	permissions.RegisterHandlers(mux, permissionsMgr)
 
 	// Events hub — bridges OpenCode SSE to browser clients.
 	eventsHub := events.NewHub()
@@ -177,4 +184,20 @@ func (a *reviewProjectResolverAdapter) Get(ctx context.Context, id string) (*pro
 		return nil, err
 	}
 	return &project, nil
+}
+
+// permissionsProjectResolverAdapter adapts the projects.Registry to permissions.ProjectResolver.
+type permissionsProjectResolverAdapter struct {
+	registry *projects.Registry
+}
+
+func (a *permissionsProjectResolverAdapter) Get(ctx context.Context, id string) (permissions.ProjectInfo, error) {
+	project, err := a.registry.Get(ctx, id)
+	if errors.Is(err, projects.ErrProjectNotFound) {
+		return permissions.ProjectInfo{}, fmt.Errorf("project not found")
+	}
+	if err != nil {
+		return permissions.ProjectInfo{}, err
+	}
+	return permissions.ProjectInfo{ID: project.ID, Path: project.Path}, nil
 }
