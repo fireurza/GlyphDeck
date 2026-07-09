@@ -14,6 +14,7 @@ import (
 
 func TestRegistryAddValidProject(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	projectDir := t.TempDir()
 
 	project, err := registry.Add(context.Background(), AddRequest{
@@ -47,6 +48,7 @@ func TestRegistryAddValidProject(t *testing.T) {
 
 func TestRegistryRejectsMissingPath(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 
 	_, err := registry.Add(context.Background(), AddRequest{Name: "Missing"})
 	if !errors.Is(err, ErrMissingPath) {
@@ -56,6 +58,7 @@ func TestRegistryRejectsMissingPath(t *testing.T) {
 
 func TestRegistryRejectsNonDirectoryPath(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	filePath := filepath.Join(t.TempDir(), "project.txt")
 	if err := os.WriteFile(filePath, []byte("not a directory"), 0o644); err != nil {
 		t.Fatalf("write file: %v", err)
@@ -69,6 +72,7 @@ func TestRegistryRejectsNonDirectoryPath(t *testing.T) {
 
 func TestRegistryRejectsDuplicatePath(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	projectDir := t.TempDir()
 
 	if _, err := registry.Add(context.Background(), AddRequest{Name: "First", Path: projectDir}); err != nil {
@@ -87,6 +91,7 @@ func TestRegistryRejectsUnsupportedWindowsPath(t *testing.T) {
 		t.Skip("Windows-only path safety check")
 	}
 	registry := newTestRegistry(t)
+	defer registry.Close()
 
 	_, err := registry.Add(context.Background(), AddRequest{Name: "Network", Path: `\\server\share\project`})
 	if !errors.Is(err, ErrUnsupportedPath) {
@@ -96,6 +101,7 @@ func TestRegistryRejectsUnsupportedWindowsPath(t *testing.T) {
 
 func TestRegistryDetectsGitBranch(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	projectDir := t.TempDir()
 	gitDir := filepath.Join(projectDir, ".git")
 	if err := os.Mkdir(gitDir, 0o755); err != nil {
@@ -119,10 +125,10 @@ func TestRegistryDetectsGitBranch(t *testing.T) {
 }
 
 func TestRegistryPersistsAndReloadsProjects(t *testing.T) {
-	storagePath := filepath.Join(t.TempDir(), ".glyphdeck", "projects.json")
-	registry, err := NewRegistry(storagePath)
+	dbPath := filepath.Join(t.TempDir(), "glyphdeck.db")
+	registry, err := NewRegistryFromPath(dbPath)
 	if err != nil {
-		t.Fatalf("NewRegistry returned error: %v", err)
+		t.Fatalf("NewRegistryFromPath returned error: %v", err)
 	}
 	projectDir := t.TempDir()
 
@@ -130,11 +136,15 @@ func TestRegistryPersistsAndReloadsProjects(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Add returned error: %v", err)
 	}
+	registry.Close()
 
-	reloaded, err := NewRegistry(storagePath)
+	// Reload from same DB file.
+	reloaded, err := NewRegistryFromPath(dbPath)
 	if err != nil {
-		t.Fatalf("reload NewRegistry returned error: %v", err)
+		t.Fatalf("reload NewRegistryFromPath returned error: %v", err)
 	}
+	defer reloaded.Close()
+
 	projects, err := reloaded.List(context.Background())
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -150,6 +160,7 @@ func TestRegistryPersistsAndReloadsProjects(t *testing.T) {
 
 func TestRegistryRemovesProject(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	projectDir := t.TempDir()
 	project, err := registry.Add(context.Background(), AddRequest{Name: "Remove Me", Path: projectDir})
 	if err != nil {
@@ -168,6 +179,7 @@ func TestRegistryRemovesProject(t *testing.T) {
 
 func TestRegistryGeneratesUniqueIDs(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	firstDir := t.TempDir()
 	secondDir := t.TempDir()
 
@@ -190,6 +202,7 @@ func TestRegistryGeneratesUniqueIDs(t *testing.T) {
 
 func TestProjectHTTPRejectsMissingJSONContentType(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	mux := http.NewServeMux()
 	RegisterHandlers(mux, registry)
 	body := strings.NewReader(`{"name":"Test","path":"` + t.TempDir() + `","trusted":false}`)
@@ -205,6 +218,7 @@ func TestProjectHTTPRejectsMissingJSONContentType(t *testing.T) {
 
 func TestProjectHTTPRejectsCrossOriginMutation(t *testing.T) {
 	registry := newTestRegistry(t)
+	defer registry.Close()
 	mux := http.NewServeMux()
 	RegisterHandlers(mux, registry)
 	body := strings.NewReader(`{"name":"Test","path":"` + t.TempDir() + `","trusted":false}`)
@@ -270,9 +284,9 @@ func TestSameOriginMutation(t *testing.T) {
 
 func newTestRegistry(t *testing.T) *Registry {
 	t.Helper()
-	registry, err := NewRegistry(filepath.Join(t.TempDir(), ".glyphdeck", "projects.json"))
+	registry, err := NewRegistryFromPath(filepath.Join(t.TempDir(), "glyphdeck.db"))
 	if err != nil {
-		t.Fatalf("NewRegistry returned error: %v", err)
+		t.Fatalf("NewRegistryFromPath returned error: %v", err)
 	}
 	return registry
 }

@@ -1,16 +1,17 @@
-// Package projects manages the local project registry.
+// Package projects manages the local project registry backed by SQLite.
 package projects
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 
 	"glyphdeck/internal/storage"
@@ -31,12 +32,14 @@ type GitInfo struct {
 }
 
 type Project struct {
-	ID      string   `json:"id"`
-	Name    string   `json:"name"`
-	Path    string   `json:"path"`
-	Trusted bool     `json:"trusted"`
-	Tags    []string `json:"tags"`
-	Git     GitInfo  `json:"git"`
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Path      string   `json:"path"`
+	Trusted   bool     `json:"trusted"`
+	Tags      []string `json:"tags"`
+	Git       GitInfo  `json:"git"`
+	CreatedAt string   `json:"createdAt,omitempty"`
+	UpdatedAt string   `json:"updatedAt,omitempty"`
 }
 
 type AddRequest struct {
@@ -45,39 +48,43 @@ type AddRequest struct {
 	Trusted bool   `json:"trusted"`
 }
 
+// Registry manages projects with SQLite persistence.
 type Registry struct {
-	mu          sync.Mutex
-	storagePath string
-	projects    []Project
+	mu   sync.Mutex
+	db   *sql.DB
+	path string // physical DB file path (for info only)
 }
 
-type registryFile struct {
-	Projects []Project `json:"projects"`
+// NewRegistry creates a Registry backed by a SQLite database handle.
+func NewRegistry(db *sql.DB) *Registry {
+	return &Registry{db: db}
+}
+
+// NewRegistryFromPath opens a SQLite database at the given path and creates a Registry.
+// Use this for testing or standalone operation.
+func NewRegistryFromPath(dbPath string) (*Registry, error) {
+	sdb, err := storage.Open(dbPath)
+	if err != nil {
+		return nil, fmt.Errorf("open registry db: %w", err)
+	}
+	return &Registry{db: sdb.Conn(), path: dbPath}, nil
+}
+
+// Close shuts down the underlying database.
+func (r *Registry) Close() error {
+	return r.db.Close()
 }
 
 func DefaultStoragePath() string {
+	return filepath.Join(".glyphdeck", "glyphdeck.db")
+}
+
+// LegacyStoragePath returns the path to the old JSON projects file.
+func LegacyStoragePath() string {
 	return filepath.Join(".glyphdeck", "projects.json")
 }
 
-func NewRegistry(storagePath string) (*Registry, error) {
-	if storagePath == "" {
-		storagePath = DefaultStoragePath()
-	}
-
-	var data registryFile
-	if err := storage.LoadJSON(storagePath, &data); err != nil {
-		return nil, fmt.Errorf("load project registry: %w", err)
-	}
-
-	for i := range data.Projects {
-		if data.Projects[i].Tags == nil {
-			data.Projects[i].Tags = []string{}
-		}
-	}
-
-	return &Registry{storagePath: storagePath, projects: data.Projects}, nil
-}
-
+// List returns all registered projects.
 func (r *Registry) List(ctx context.Context) ([]Project, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
@@ -86,9 +93,29 @@ func (r *Registry) List(ctx context.Context) ([]Project, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	return cloneProjects(r.projects), nil
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, name, path, trusted, tags_json, git_is_repo, git_branch, created_at, updated_at
+		 FROM projects ORDER BY name`)
+	if err != nil {
+		return nil, fmt.Errorf("list projects: %w", err)
+	}
+	defer rows.Close()
+
+	var projects []Project
+	for rows.Next() {
+		p, err := scanProject(rows)
+		if err != nil {
+			return nil, err
+		}
+		projects = append(projects, p)
+	}
+	if projects == nil {
+		projects = []Project{}
+	}
+	return projects, rows.Err()
 }
 
+// Add registers a new project.
 func (r *Registry) Add(ctx context.Context, req AddRequest) (Project, error) {
 	if err := ctx.Err(); err != nil {
 		return Project{}, err
@@ -107,31 +134,49 @@ func (r *Registry) Add(ctx context.Context, req AddRequest) (Project, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
+	// Check duplicate path.
 	normalizedKey := pathKey(normalizedPath)
-	for _, project := range r.projects {
-		if pathKey(project.Path) == normalizedKey {
+	var existingCount int
+	if err := r.db.QueryRowContext(ctx,
+		"SELECT COUNT(*) FROM projects WHERE path = ?", normalizedPath).Scan(&existingCount); err != nil {
+		return Project{}, fmt.Errorf("check duplicate: %w", err)
+	}
+	// Also check case-insensitive.
+	all, err := r.listLocked(ctx)
+	if err != nil {
+		return Project{}, err
+	}
+	for _, p := range all {
+		if pathKey(p.Path) == normalizedKey {
 			return Project{}, ErrDuplicatePath
 		}
 	}
 
-	project := Project{
-		ID:      nextID(name, normalizedPath, r.projects),
-		Name:    name,
-		Path:    normalizedPath,
-		Trusted: req.Trusted,
-		Tags:    []string{},
-		Git:     DetectGit(normalizedPath),
+	id := nextID(name, normalizedPath, all)
+	git := DetectGit(normalizedPath)
+	now := time.Now().UTC().Format(time.RFC3339)
+
+	_, err = r.db.ExecContext(ctx,
+		`INSERT INTO projects (id, name, path, trusted, tags_json, git_is_repo, git_branch, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, '[]', ?, ?, ?, ?)`,
+		id, name, normalizedPath, boolToInt(req.Trusted), boolToInt(git.IsRepo), git.Branch, now, now)
+	if err != nil {
+		return Project{}, fmt.Errorf("insert project: %w", err)
 	}
 
-	r.projects = append(r.projects, project)
-	if err := r.saveLocked(); err != nil {
-		r.projects = r.projects[:len(r.projects)-1]
-		return Project{}, err
-	}
-
-	return project, nil
+	return Project{
+		ID:        id,
+		Name:      name,
+		Path:      normalizedPath,
+		Trusted:   req.Trusted,
+		Tags:      []string{},
+		Git:       git,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}, nil
 }
 
+// Get returns a single project by ID.
 func (r *Registry) Get(ctx context.Context, id string) (Project, error) {
 	if err := ctx.Err(); err != nil {
 		return Project{}, err
@@ -140,15 +185,14 @@ func (r *Registry) Get(ctx context.Context, id string) (Project, error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for _, project := range r.projects {
-		if project.ID == id {
-			return cloneProject(project), nil
-		}
-	}
+	row := r.db.QueryRowContext(ctx,
+		`SELECT id, name, path, trusted, tags_json, git_is_repo, git_branch, created_at, updated_at
+		 FROM projects WHERE id = ?`, id)
 
-	return Project{}, ErrProjectNotFound
+	return scanProject(row)
 }
 
+// Remove deletes a project by ID.
 func (r *Registry) Remove(ctx context.Context, id string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -157,21 +201,92 @@ func (r *Registry) Remove(ctx context.Context, id string) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	for i, project := range r.projects {
-		if project.ID == id {
-			removed := project
-			r.projects = append(r.projects[:i], r.projects[i+1:]...)
-			if err := r.saveLocked(); err != nil {
-				r.projects = append(r.projects, Project{})
-				copy(r.projects[i+1:], r.projects[i:])
-				r.projects[i] = removed
-				return err
-			}
-			return nil
+	result, err := r.db.ExecContext(ctx, "DELETE FROM projects WHERE id = ?", id)
+	if err != nil {
+		return fmt.Errorf("delete project: %w", err)
+	}
+	n, _ := result.RowsAffected()
+	if n == 0 {
+		return ErrProjectNotFound
+	}
+	return nil
+}
+
+// listLocked returns all projects without locking (caller holds mu).
+func (r *Registry) listLocked(ctx context.Context) ([]Project, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT id, name, path, trusted, tags_json, git_is_repo, git_branch, created_at, updated_at
+		 FROM projects ORDER BY name`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var projects []Project
+	for rows.Next() {
+		p, err := scanProject(rows)
+		if err != nil {
+			return nil, err
 		}
+		projects = append(projects, p)
+	}
+	return projects, rows.Err()
+}
+
+// scanProject reads a single project from a row scanner.
+func scanProject(row interface{ Scan(...interface{}) error }) (Project, error) {
+	var (
+		id, name, path, tagsJSON, gitBranch, createdAt, updatedAt string
+		trusted, gitIsRepo                                         int
+	)
+	err := row.Scan(&id, &name, &path, &trusted, &tagsJSON, &gitIsRepo, &gitBranch, &createdAt, &updatedAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return Project{}, ErrProjectNotFound
+		}
+		return Project{}, fmt.Errorf("scan project: %w", err)
 	}
 
-	return ErrProjectNotFound
+	tags := parseTags(tagsJSON)
+	return Project{
+		ID:        id,
+		Name:      name,
+		Path:      path,
+		Trusted:   trusted != 0,
+		Tags:      tags,
+		Git:       GitInfo{IsRepo: gitIsRepo != 0, Branch: gitBranch},
+		CreatedAt: createdAt,
+		UpdatedAt: updatedAt,
+	}, nil
+}
+
+func parseTags(jsonStr string) []string {
+	if jsonStr == "" || jsonStr == "[]" {
+		return []string{}
+	}
+	// Simple parser for ["tag1","tag2"].
+	s := strings.TrimPrefix(jsonStr, "[")
+	s = strings.TrimSuffix(s, "]")
+	if s == "" {
+		return []string{}
+	}
+	parts := strings.Split(s, ",")
+	tags := make([]string, 0, len(parts))
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		p = strings.Trim(p, `"`)
+		if p != "" {
+			tags = append(tags, p)
+		}
+	}
+	return tags
+}
+
+func boolToInt(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func DetectGit(projectPath string) GitInfo {
@@ -193,87 +308,75 @@ func DetectGit(projectPath string) GitInfo {
 	return GitInfo{IsRepo: true, Branch: branch}
 }
 
-func (r *Registry) saveLocked() error {
-	data := registryFile{Projects: r.projects}
-	if err := storage.SaveJSON(r.storagePath, data); err != nil {
-		return fmt.Errorf("save project registry: %w", err)
-	}
-	return nil
-}
-
-func normalizePath(value string) (string, error) {
-	path := strings.TrimSpace(value)
-	if path == "" {
+// normalizePath validates and normalizes a project directory path.
+func normalizePath(raw string) (string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
 		return "", ErrMissingPath
 	}
-	if isUnsafeWindowsPath(path) {
+
+	evaluated, err := filepath.EvalSymlinks(trimmed)
+	if err != nil {
+		return "", ErrPathNotFound
+	}
+
+	abs, err := filepath.Abs(evaluated)
+	if err != nil {
 		return "", ErrUnsupportedPath
 	}
 
-	absPath, err := filepath.Abs(path)
+	info, err := os.Stat(abs)
 	if err != nil {
-		return "", fmt.Errorf("normalize project path: %w", err)
-	}
-	cleanPath := filepath.Clean(absPath)
-
-	info, err := os.Stat(cleanPath)
-	if errors.Is(err, os.ErrNotExist) {
-		return "", ErrPathNotFound
-	}
-	if err != nil {
-		return "", fmt.Errorf("stat project path: %w", err)
+		if errors.Is(err, os.ErrNotExist) {
+			return "", ErrPathNotFound
+		}
+		return "", ErrUnsupportedPath
 	}
 	if !info.IsDir() {
 		return "", ErrPathNotDirectory
 	}
 
-	return cleanPath, nil
+	return abs, nil
 }
 
-func isUnsafeWindowsPath(path string) bool {
-	if runtime.GOOS != "windows" {
-		return false
+// nextID generates a stable project ID from name and path.
+func nextID(name, path string, existing []Project) string {
+	slug := slugify(name)
+	if slug == "" {
+		slug = slugify(filepath.Base(path))
 	}
-	return strings.HasPrefix(path, `\\`) || strings.HasPrefix(path, `//`)
+	if slug == "" {
+		slug = "project"
+	}
+
+	base := slug
+	n := 1
+	for {
+		id := base
+		if n > 1 {
+			id = fmt.Sprintf("%s-%d", base, n)
+		}
+		if !idExists(id, existing) {
+			return id
+		}
+		n++
+	}
 }
 
-func pathKey(projectPath string) string {
-	key := filepath.Clean(projectPath)
-	if runtime.GOOS == "windows" {
-		return strings.ToLower(key)
-	}
-	return key
-}
-
-func nextID(name, projectPath string, projects []Project) string {
-	base := slugify(name)
-	if base == "" {
-		base = slugify(filepath.Base(projectPath))
-	}
-	if base == "" {
-		base = "project"
-	}
-
-	used := map[string]struct{}{}
-	for _, project := range projects {
-		used[project.ID] = struct{}{}
-	}
-
-	if _, ok := used[base]; !ok {
-		return base
-	}
-	for suffix := 2; ; suffix++ {
-		candidate := fmt.Sprintf("%s-%d", base, suffix)
-		if _, ok := used[candidate]; !ok {
-			return candidate
+func idExists(id string, existing []Project) bool {
+	for _, p := range existing {
+		if p.ID == id {
+			return true
 		}
 	}
+	return false
 }
 
-func slugify(value string) string {
+func slugify(name string) string {
+	name = strings.ToLower(name)
 	var builder strings.Builder
 	lastHyphen := false
-	for _, r := range strings.ToLower(value) {
+	for _, r := range name {
 		switch {
 		case unicode.IsLetter(r) || unicode.IsDigit(r):
 			builder.WriteRune(r)
@@ -286,27 +389,16 @@ func slugify(value string) string {
 	return strings.Trim(builder.String(), "-")
 }
 
-func cloneProjects(projects []Project) []Project {
-	cloned := make([]Project, len(projects))
-	for i, project := range projects {
-		cloned[i] = cloneProject(project)
-	}
-	return cloned
+func pathKey(p string) string {
+	return strings.ToLower(strings.ReplaceAll(p, "\\", "/"))
 }
 
-func cloneProject(project Project) Project {
-	if project.Tags == nil {
-		project.Tags = []string{}
-		return project
-	}
-	project.Tags = append([]string{}, project.Tags...)
-	return project
-}
-
+// httpHandler is the HTTP handler for project routes.
 type httpHandler struct {
 	registry *Registry
 }
 
+// RegisterHandlers mounts project routes on the given mux.
 func RegisterHandlers(mux *http.ServeMux, registry *Registry) {
 	handler := httpHandler{registry: registry}
 	mux.HandleFunc("GET /api/projects", handler.list)

@@ -36,6 +36,9 @@ Thumbs.db
 
 # GlyphDeck local data
 .glyphdeck/
+*.db
+*.db-wal
+*.db-shm
 
 # Logs
 npm-debug.log*
