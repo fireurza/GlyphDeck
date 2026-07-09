@@ -14,6 +14,7 @@ import (
 	"glyphdeck/internal/review"
 	"glyphdeck/internal/servers"
 	"glyphdeck/internal/sessions"
+	"glyphdeck/internal/storage"
 	"glyphdeck/internal/terminal"
 	"glyphdeck/internal/usage"
 	"log"
@@ -32,7 +33,24 @@ func main() {
 		log.Fatalf("server host must be loopback-only; set GLYPHDECK_HOST to 127.0.0.1 or localhost")
 	}
 	addr := net.JoinHostPort(host, port)
-	registry, err := projects.NewRegistry(projects.DefaultStoragePath())
+
+	// Open SQLite database.
+	db, err := storage.Open(storage.DefaultDBPath())
+	if err != nil {
+		log.Fatalf("database error: %v", err)
+	}
+	defer db.Close()
+
+	// Migrate legacy JSON projects if present.
+	jsonPath := projects.LegacyStoragePath()
+	if imported, err := db.MigrateFromJSON(jsonPath); err != nil {
+		log.Printf("migration warning: %v", err)
+	} else if imported > 0 {
+		log.Printf("migrated %d projects from %s to SQLite", imported, jsonPath)
+	}
+
+	// Create project registry backed by SQLite.
+	registry := projects.NewRegistry(db.Conn())
 	if err != nil {
 		log.Fatalf("project registry error: %v", err)
 	}
