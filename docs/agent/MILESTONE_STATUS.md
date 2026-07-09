@@ -48,6 +48,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 8 — Permissions | Accepted | a004682 | Permission approval popup with once/always/reject; forced-bash rule triggers popup; dismiss and resume verified; M5/M6/M7 regressions clean |
 | Milestone 9 — User Terminal | Accepted | 4473bab | Interactive shell via exec.Command pipes (PTY unsupported on Windows with current stack); SSE output streaming; HTTP POST input; start/run/close verified; layout preserved |
 | Milestone 10 — POC hardening | Accepted | 96715c5 | Browser refresh preserves project state (localStorage); graceful shutdown stops app-owned servers/terminals; Problems tab with bounded ring buffer; terminal output timer-based flush; complete README docs |
+| Milestone 11 — SQLite persistence | Accepted | 09c23ee | Project registry backed by SQLite (modernc.org/sqlite, pure Go); JSON migration on first startup; project data survives backend restart; all M10 regressions clean |
 
 ---
 
@@ -62,12 +63,10 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-MVP Milestone 11 — SQLite persistence
+MVP Milestone 12 — State model cleanup
 ```
 
-MVP v0.1.0 planning complete. See docs/agent/MVP_V0_1_0_PLAN.md.
-
-M10 hardening delivered: browser refresh preserves project state; graceful shutdown stops app-owned servers/terminals; Problems tab tracks app errors; README complete.
+M11 accepted (SQLite persistence for project registry).
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -79,10 +78,10 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 10 accepted; bump to MVP label when M11 work begins):
+Current expected label (Milestone 11 accepted; bump to Milestone 12 when M12 work begins):
 
 ```text
-Milestone 10
+Milestone 11
 ```
 
 Rules:
