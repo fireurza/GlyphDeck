@@ -50,6 +50,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 10 — POC hardening | Accepted | 96715c5 | Browser refresh preserves project state (localStorage); graceful shutdown stops app-owned servers/terminals; Problems tab with bounded ring buffer; terminal output timer-based flush; complete README docs |
 | Milestone 11 — SQLite persistence | Accepted | 09c23ee | Project registry backed by SQLite (modernc.org/sqlite, pure Go); JSON migration on first startup; project data survives backend restart; all M10 regressions clean |
 | Milestone 12 — State model cleanup | Accepted | a905eb6 | Sessions auto-load when project becomes ready (browser refresh, server start); event stream shows Offline not Error after intentional stop; session creation works after refresh; validation corrected (vision review + Notepad/npx.ps1 guard) |
+| Milestone 13 — Settings + embed + release | Accepted | 137cee6 | Settings page (SQLite-backed, save persists); Go binary serves frontend in release mode; cross-platform build script; all regressions clean |
 
 ---
 
@@ -64,10 +65,10 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-MVP Milestone 13 — Settings + embedded frontend + release validation
+v0.1.0 — MVP release candidate
 ```
 
-M12 accepted (state model cleanup: session auto-load, event stream Offline after stop).
+M13 accepted (settings page, embedded frontend release path).
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -79,10 +80,10 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 12 accepted; bump to Milestone 13 when M13 work begins):
+Current expected label (Milestone 13 accepted; bump to v0.1.0 when release prep begins):
 
 ```text
-Milestone 12
+Milestone 13
 ```
 
 Rules:
