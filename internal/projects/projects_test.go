@@ -93,9 +93,25 @@ func TestRegistryRejectsUnsupportedWindowsPath(t *testing.T) {
 	registry := newTestRegistry(t)
 	defer registry.Close()
 
-	_, err := registry.Add(context.Background(), AddRequest{Name: "Network", Path: `\\server\share\project`})
-	if !errors.Is(err, ErrUnsupportedPath) {
-		t.Fatalf("Add error = %v, want ErrUnsupportedPath", err)
+	for _, networkPath := range []string{
+		`\\server\share\project`,
+		`//server/share/project`,
+		`\/server/share/project`,
+		`/\\server/share/project`,
+	} {
+		_, err := registry.Add(context.Background(), AddRequest{Name: "Network", Path: networkPath})
+		if !errors.Is(err, ErrUnsupportedPath) {
+			t.Fatalf("Add(%q) error = %v, want ErrUnsupportedPath", networkPath, err)
+		}
+	}
+}
+
+func TestLegacyStoragePathUsesDataDirOverride(t *testing.T) {
+	dataDir := filepath.Join(t.TempDir(), "glyphdeck-data")
+	t.Setenv("GLYPHDECK_DATA_DIR", dataDir)
+
+	if got, want := LegacyStoragePath(), filepath.Join(dataDir, "projects.json"); got != want {
+		t.Fatalf("LegacyStoragePath() = %q, want %q", got, want)
 	}
 }
 

@@ -10,7 +10,7 @@
 | Phase | Phase 2 — MVP / v0.1.0 |
 | Created | 2026-07-09 |
 | Based on | GlyphDeck Roadmap, POC Implementation Plan, Technical Architecture |
-| Accepted POC baseline | M0 through M10 (commit 96715c5) |
+| Accepted baseline | M0 through M14; v0.1.0 release candidate validated |
 
 ---
 
@@ -23,7 +23,8 @@ v0.1.0 means:
 ```text
 Local-first GlyphDeck app
 Durable storage (SQLite)
-Reliable project/session state
+Durable project and Settings state
+Reliable browser-refresh selection state
 Stable OpenCode integration
 Usable review, usage, permissions, and terminal workflows
 Single-binary install path
@@ -34,9 +35,9 @@ The POC proved the core architecture. The MVP makes it durable and distributable
 
 ---
 
-## 2. Current Accepted POC Capabilities
+## 2. Current Accepted Capabilities
 
-All M0 through M10 are accepted with validated smoke evidence.
+All M0 through M14 are accepted with validated smoke evidence.
 
 | Milestone | Capability | Evidence |
 |---|---|---|
@@ -52,6 +53,10 @@ All M0 through M10 are accepted with validated smoke evidence.
 | M8 | Permissions | Approval popup, once/always/reject |
 | M9 | User Terminal | Interactive shell via exec.Command pipes |
 | M10 | POC hardening | Browser refresh, problems tab, graceful shutdown, README |
+| M11 | SQLite persistence | Projects migrate from JSON to SQLite and persist across restart |
+| M12 | State model cleanup | Session and intentional-stop state are reliable after refresh |
+| M13 | Settings + embedded release | SQLite-backed Settings and embedded single-binary release build |
+| M14 | Terminal reliability | Terminal SSE marker output is reliable |
 
 ---
 
@@ -81,22 +86,34 @@ The validation record is completed with **M14 vision review PASS**: the existing
 reviewed for the Milestone 14 label, visible terminal marker/output, terminal
 open/close states, panel integrity, clipping, and unexpected error banners.
 
+### 3.2 v0.1.0 Release-Candidate Evidence
+
+The release-candidate build was validated from the embedded `dist/glyphdeck.exe`
+binary with isolated app data. The `mvp` smoke passed on 2026-07-09 with 17
+fresh screenshots and a manifest under `.glyphdeck/validation/mvp/screenshots/`.
+It verifies the v0.1.0 label, SQLite-backed Settings persistence, project/server/
+session lifecycle, Review/Usage/Agent Terminal/Terminal/Problems regressions,
+terminal marker output, orderly shutdown, and a full 1280×720 layout.
+
+Settings remains reachable from the activity rail, but it now opens as a centered
+modal overlay above the dock. The dock contains only Problems, Agent Terminal,
+and Terminal. Vision review PASS.
+
 ---
 
-## 4. Known Technical Caveats (Carried Forward from POC)
+## 4. Known Technical Caveats
 
-These issues are documented, accepted, and must be addressed during MVP:
+These limitations remain after the release-candidate work:
 
 | Issue | Severity | Plan |
 |---|---|---|
-| Terminal uses exec.Command pipes, not true PTY | Medium | Investigate ConPTY or alternative library in M14 |
-| Terminal SSE output buffering | Low | Timer-based flush added in M10; stronger treatment in M14 |
-| Post-refresh session creation needs LeftPanel polling coordination | Low | State model cleanup in M12 |
-| No SQLite — JSON/projects.json only | High | M11 |
-| No auth — localhost/dev only | High | M13 or later per roadmap |
-| No embedded frontend — requires `npm run dev` | Medium | M15 |
+| Terminal uses exec.Command pipes, not true PTY | Medium | ConPTY/alternative terminal work remains a later enhancement |
+| Server processes and terminals do not persist across backend restart | Medium | App-owned processes intentionally stop at shutdown; restart them explicitly |
+| Session data is supplied by the running OpenCode server, not cached in SQLite | Medium | Reload sessions after the server is available |
+| No auth — localhost only | High | Remains a v0.1.0 non-goal |
 | No installer — `go build` + manual setup | Medium | v0.2.x per roadmap |
 | OpenCode API may drift | Medium | Monitor; OpenCode adapter isolation helps |
+| Usage is unavailable until OpenCode supplies usage fields | Low | Expected provider-dependent state, shown explicitly in the UI |
 
 ---
 
@@ -106,8 +123,11 @@ These issues are documented, accepted, and must be addressed during MVP:
 
 ```text
 GlyphDeck v0.1.0 is a single-binary, locally hosted web desktop for OpenCode.
-It persists project/server/session state across restarts.
-It binds to localhost by default with optional private-network binding.
+It persists registered projects and Settings in SQLite.
+It restores selected project/session IDs across a browser refresh while the
+associated OpenCode server remains available.
+It intentionally stops app-owned servers and terminals at backend shutdown.
+It binds to localhost by default.
 It can be installed by downloading a single Go binary.
 It passes a complete release validation harness.
 ```
@@ -115,10 +135,10 @@ It passes a complete release validation harness.
 ### Exit criteria
 
 ```text
-1. SQLite stores all app state (projects, servers, sessions, problems, UI state).
+1. SQLite stores registered projects and Settings, with legacy projects JSON migration.
 2. Backend starts from a single Go binary serving embedded React assets.
-3. Browser refresh restores all relevant state.
-4. OpenCode integration remains stable across restarts.
+3. Browser refresh restores the selected project/session when the OpenCode server is available.
+4. App-owned OpenCode servers and terminals stop cleanly at backend shutdown.
 5. All POC panels (Review, Usage, Agent Terminal, Terminal, Problems, Permissions) remain functional.
 6. Release validation harness passes end-to-end.
 7. README documents the single-binary install and run path.
@@ -145,7 +165,7 @@ Public network exposure
 
 ---
 
-## 7. Proposed MVP Milestone Sequence
+## 7. Completed MVP Milestone Sequence
 
 Based on the GlyphDeck Roadmap (v0.1.0 — MVP Local Product) and POC Implementation Plan:
 
@@ -154,9 +174,11 @@ Based on the GlyphDeck Roadmap (v0.1.0 — MVP Local Product) and POC Implementa
 | M11 | SQLite persistence | Roadmap: "SQLite app storage" |
 | M12 | State model cleanup | Roadmap: "Session list/create/resume/reopen", "Transcript persistence/reload" |
 | M13 | Settings + embed + release | Roadmap: "Basic settings page", "Go binary serving embedded React assets" |
+| M14 | Terminal reliability | Release-candidate reliability correction |
 | v0.1.0 | MVP release candidate | Roadmap exit criteria |
 
-The POC Implementation Plan task breakdown ends at M10. The Roadmap v0.1.0 scope defines the next steps. M11-M13 fill the gap from POC to MVP.
+The POC Implementation Plan task breakdown ends at M10. The Roadmap v0.1.0 scope
+defined the next steps; M11-M14 completed the gap from POC to MVP.
 
 ### Why this order
 
@@ -166,7 +188,12 @@ The POC Implementation Plan task breakdown ends at M10. The Roadmap v0.1.0 scope
 
 ---
 
-## 8. Milestone Details
+## 8. Historical MVP Planning Details
+
+The remaining detailed milestone, storage, API, and risk sections preserve the
+original roadmap plan. They are not claims that every planned persistence table
+or restart behavior is in the current release candidate; the current capability
+and caveat sections above are authoritative.
 
 ### M11 — SQLite Persistence
 
@@ -264,6 +291,7 @@ The POC Implementation Plan task breakdown ends at M10. The Roadmap v0.1.0 scope
 - Release validation harness: end-to-end smoke covering all M0-M13 capabilities.
 - Cross-platform build script (Windows, Linux, macOS).
 - Updated README with single-binary install instructions.
+- Settings opens from the activity rail as an overlay and does not consume a dock tab.
 
 **Out of scope:**
 - Auth settings UI.
@@ -288,6 +316,7 @@ The POC Implementation Plan task breakdown ends at M10. The Roadmap v0.1.0 scope
 **Acceptance criteria:**
 - Single binary serves complete GlyphDeck UI.
 - Settings changes survive restart.
+- Settings is reachable from the activity rail and leaves the dock with only Problems, Agent Terminal, and Terminal.
 - Release smoke passes on all target platforms.
 
 **Risk:** Medium — embed requires build pipeline changes and path resolution updates.
@@ -297,15 +326,14 @@ The POC Implementation Plan task breakdown ends at M10. The Roadmap v0.1.0 scope
 
 ### v0.1.0 — Release Candidate
 
-**Goal:** Tag v0.1.0 after all M11-M13 acceptance criteria are met.
+**Goal:** Validate the candidate after M11-M14. Tagging and changelog publication
+are separate release actions.
 
 **Checklist:**
-- All M11-M13 smoke tests pass.
-- README documents single-binary install.
-- Known limitations documented.
-- No known data-loss bugs.
-- Release tag created.
-- Changelog written.
+- M11-M14 regressions and the release smoke pass.
+- README documents the embedded single-binary build/run path.
+- Known limitations and intentional shutdown behavior are documented.
+- A v0.1.0 tag and changelog are created only when separately authorized.
 
 ---
 
@@ -434,14 +462,15 @@ settings (key, value, updated_at)
 
 ### Unit tests
 
+- Build `web/dist` first; it is embedded by the Go release package.
 - Go packages: use `go test ./... -count=1`.
 - Mock OpenCode client for session/usage/review/permission tests.
 - In-memory SQLite for storage tests.
 
 ### Static analysis
 
-- `go vet ./cmd/... ./internal/...`
-- `npm --prefix web run build` (TypeScript + Vite).
+- `npm.cmd --prefix web run build` (TypeScript + Vite; before Go compilation on Windows).
+- `go vet ./cmd/... ./internal/... ./web`.
 
 ### Browser smoke
 

@@ -2,7 +2,7 @@
 
 GlyphDeck is a local-first web workspace for managing projects, detecting OpenCode, running per-project OpenCode servers, streaming transcripts, reviewing changes, tracking usage, handling permissions, and using an interactive terminal — all from a browser UI.
 
-## POC Capabilities (M0-M10)
+## Accepted Capabilities (M0-M14)
 
 | Milestone | Feature | Status |
 |---|---|---|
@@ -18,12 +18,20 @@ GlyphDeck is a local-first web workspace for managing projects, detecting OpenCo
 | M8 | Permissions (approval popup with once/always/reject) | Accepted |
 | M9 | User Terminal (interactive shell in project cwd) | Accepted |
 | M10 | POC hardening (browser refresh, problems tab, graceful shutdown, docs) | Accepted |
+| M11 | SQLite project persistence and JSON migration | Accepted |
+| M12 | Browser-refresh and intentional-stop state cleanup | Accepted |
+| M13 | SQLite-backed Settings and release build plumbing | Accepted |
+| M14 | Reliable terminal SSE marker streaming | Accepted |
 
-## Next Phase: MVP v0.1.0
+## v0.1.0 Release Candidate
 
 See [docs/agent/MVP_V0_1_0_PLAN.md](docs/agent/MVP_V0_1_0_PLAN.md) for the full MVP plan.
 
-Next implementation milestone: **M11 — SQLite persistence**.
+The release candidate serves the React build from `glyphdeck.exe`, uses SQLite for
+projects and Settings, and has a fresh isolated MVP smoke suite. Settings is
+opened from the activity rail as a modal overlay; the bottom dock contains only
+Problems, Agent Terminal, and Terminal. Tagging and release notes remain a
+separate release action.
 
 ## Prerequisites
 
@@ -48,6 +56,7 @@ Working directory: project root
 **Backend:**
 
 ```powershell
+npm.cmd --prefix web run build
 go run ./cmd/glyphdeck
 ```
 
@@ -56,35 +65,48 @@ Starts on `http://127.0.0.1:8756`. Health check at `/healthz`.
 **Frontend:**
 
 ```powershell
-cd web && npm install
-cd web && npm run dev
+npm.cmd --prefix web install
+npm.cmd --prefix web run dev
 ```
 
 Starts Vite dev server (default: `http://localhost:5173`).
+
+### Release binary
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1
+.\dist\glyphdeck.exe
+```
+
+The binary listens on `http://127.0.0.1:8756` and does not require a `web/dist`
+directory beside its working directory after it has been built.
 
 ## Validation
 
 ### Quick validation
 
 ```powershell
-go test ./...
-cd web && npm run build
+npm.cmd --prefix web run build
+go test ./... -count=1
+go vet ./cmd/... ./internal/... ./web
 ```
 
-### Full POC smoke test (M10)
+### Full release-candidate smoke test (v0.1.0)
 
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\run-m10-smoke.ps1
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\run-mvp-smoke.ps1
 ```
 
 All validation artifacts are stored under `.glyphdeck/validation/<milestone>/` (git-ignored):
 
 ```
-.glyphdeck/validation/m10/
+.glyphdeck/validation/mvp/
 ├── logs/
 ├── screenshots/
 ├── scripts/
 ├── pids/
+├── data/
+├── launch/
 └── workspace/
 ```
 
@@ -153,7 +175,7 @@ All validation artifacts are stored under `.glyphdeck/validation/<milestone>/` (
 Shell: PowerShell 7
 Working directory: project root
 
-1. Start backend: `go run ./cmd/glyphdeck`
+1. Build frontend and start backend: `npm.cmd --prefix web run build`; then `go run ./cmd/glyphdeck`
 2. Start frontend in second terminal: `cd web && npm run dev`
 3. Add the current GlyphDeck repo path in the left Projects panel.
 4. Confirm the project appears with Git repo status and branch.
@@ -174,14 +196,16 @@ Working directory: project root
 19. Confirm server stops.
 20. Open the Problems tab and confirm "No problems detected." is shown.
 21. Refresh the browser and confirm the selected project is restored.
+22. Click the Settings icon in the activity rail, confirm it opens as an overlay above the three-tab dock, save a value, and reopen it.
 
 ## Known Limitations
 
 - **No auth.** GlyphDeck binds to 127.0.0.1 only. Do not expose to public networks.
-- **No SQLite.** Project registry is stored as JSON under `.glyphdeck/projects.json`.
+- **Projects and Settings use SQLite.** The default database is `.glyphdeck/glyphdeck.db`; legacy projects JSON migrates on startup.
 - **No LAN/Tailscale binding.** Only localhost access.
-- **No installer.** Run via `go run` and `npm run dev`.
+- **No installer.** Build and run the single binary manually.
 - **Terminal is pipe-based on Windows.** True PTY (ConPTY) is blocked with current Go libraries. The terminal uses `os/exec` with pipes — interactive shell works but no TTY resize, no signals.
+- **Servers and terminals are intentionally stopped at backend shutdown.** Their process state is not persisted across a backend restart; browser selection is restored from local storage and sessions are reloaded from the running OpenCode server.
 - **Agent Terminal shows only live activity.** Does not backfill history from before session selection.
 - **Usage tab shows latest assistant message only.** Not per-message or cumulative totals.
 - **Review tab uses local `git` commands for file status.** No OpenCode VCS API integration yet.
@@ -200,15 +224,11 @@ If not found, ensure OpenCode is installed and on PATH.
 
 ### Server stuck
 
-```powershell
-# Kill stuck backend on port 8756
-$p = Get-NetTCPConnection -LocalPort 8756 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
-Stop-Process -Id $p -Force
-
-# Kill stuck frontend on port 5173
-$p = Get-NetTCPConnection -LocalPort 5173 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
-Stop-Process -Id $p -Force
-```
+If it was started by the MVP validation harness, run
+`pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\stop-dev-mvp.ps1`.
+For a manually started server, stop it from the terminal that launched it (for
+example, `Ctrl+C`) after confirming it is the process you own. Do not kill an
+arbitrary process merely because it owns a common port.
 
 ### Event stream offline
 

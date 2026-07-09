@@ -18,11 +18,14 @@ import (
 	"glyphdeck/internal/storage"
 	"glyphdeck/internal/terminal"
 	"glyphdeck/internal/usage"
+	"glyphdeck/web"
+	"io/fs"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 )
@@ -108,8 +111,7 @@ func main() {
 	// Dev tools — only registered when GLYPHDECK_DEV_TOOLS=1.
 	devtools.RegisterHandlers(mux, registry, manager)
 
-	// Frontend — serve embedded React assets (release mode), or fall back
-	// to 404 for dev mode (Vite dev server handles frontend).
+	// Frontend — serve the compiled React assets embedded in this binary.
 	mux.HandleFunc("/", serveFrontend)
 
 	srv := &http.Server{
@@ -271,29 +273,26 @@ func (a *terminalProjectResolverAdapter) GetPath(ctx context.Context, id string)
 	return project.Path, nil
 }
 
-// serveFrontend serves the React frontend from disk (release mode)
-// or returns 404 (dev mode — Vite handles frontend).
+// serveFrontend serves the React frontend embedded in the release binary.
+// Vite still serves the frontend directly during development.
 func serveFrontend(w http.ResponseWriter, r *http.Request) {
-	fsPath := "web/dist"
-	// Check if the dist directory exists (release build) or fall back (dev with Vite).
-	if _, err := os.Stat(fsPath); err != nil {
-		// Dev mode — let Vite handle it, or return a minimal message.
-		w.WriteHeader(http.StatusNotFound)
-		w.Write([]byte("Frontend not built. Run `cd web && npm run build` for release mode, or use `npm run dev` for development."))
+	assets := web.Assets()
+	server := http.FileServer(http.FS(assets))
+
+	// Serve compiled files directly, retaining the SPA fallback for client routes.
+	assetPath := strings.TrimPrefix(r.URL.Path, "/")
+	if assetPath == "" {
+		server.ServeHTTP(w, r)
+		return
+	}
+	if _, err := fs.Stat(assets, assetPath); err == nil {
+		server.ServeHTTP(w, r)
 		return
 	}
 
-	fs := http.FileServer(http.Dir(fsPath))
-
-	// Try to serve the requested file directly.
-	f, err := os.Open(fsPath + r.URL.Path)
-	if err == nil {
-		f.Close()
-		fs.ServeHTTP(w, r)
-		return
-	}
-
-	// SPA fallback: serve index.html for non-file routes.
-	r.URL.Path = "/"
-	fs.ServeHTTP(w, r)
+	spaRequest := r.Clone(r.Context())
+	spaURL := *r.URL
+	spaURL.Path = "/"
+	spaRequest.URL = &spaURL
+	server.ServeHTTP(w, spaRequest)
 }
