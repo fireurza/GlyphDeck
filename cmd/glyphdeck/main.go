@@ -9,6 +9,7 @@ import (
 	"glyphdeck/internal/events"
 	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/permissions"
+	"glyphdeck/internal/problems"
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/review"
 	"glyphdeck/internal/servers"
@@ -72,6 +73,10 @@ func main() {
 	terminal.RegisterHandlers(mux, terminalMgr)
 	defer terminalMgr.CloseAll()
 
+	// Problems.
+	problemsMgr := problems.NewManager(100)
+	problems.RegisterHandlers(mux, problemsMgr)
+
 	// Events hub — bridges OpenCode SSE to browser clients.
 	eventsHub := events.NewHub()
 	manager.SetEventBridgeManager(eventsHub)
@@ -102,10 +107,27 @@ func main() {
 	<-quit
 
 	log.Println("GlyphDeck server shutting down...")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
 
-	if err := srv.Shutdown(ctx); err != nil {
+	// Stop all app-owned OpenCode servers.
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer shutdownCancel()
+
+	stopped, err := manager.StopAllAppOwned(shutdownCtx)
+	if err != nil {
+		log.Printf("shutdown: error stopping OpenCode servers: %v", err)
+	} else {
+		log.Printf("shutdown: stopped %d app-owned OpenCode server(s)", len(stopped))
+	}
+
+	// Stop all app-owned terminals.
+	terminalMgr.CloseAll()
+	log.Println("shutdown: terminals closed")
+
+	// Stop event hub bridges.
+	eventsHub.StopAll()
+	log.Println("shutdown: event bridges stopped")
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Fatalf("server shutdown error: %v", err)
 	}
 	log.Println("GlyphDeck server stopped")

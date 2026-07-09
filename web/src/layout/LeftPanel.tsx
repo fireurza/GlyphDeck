@@ -7,11 +7,13 @@ import type { OpencodeStatus, ServerStatus } from '../types/opencode'
 import type { GlyphSession } from '../types/session'
 
 interface LeftPanelProps {
+  initialProjectId?: string | null
+  initialSessionId?: string | null
   onSelectProject?: (projectId: string) => void
   onSelectSession?: (projectId: string, sessionId: string) => void
 }
 
-function LeftPanel({ onSelectProject, onSelectSession }: LeftPanelProps) {
+function LeftPanel({ initialProjectId, onSelectProject, onSelectSession }: LeftPanelProps) {
   const [projects, setProjects] = useState<Project[]>([])
   const [name, setName] = useState('')
   const [path, setPath] = useState('')
@@ -23,7 +25,9 @@ function LeftPanel({ onSelectProject, onSelectSession }: LeftPanelProps) {
   const [opencodeStatus, setOpencodeStatus] = useState<OpencodeStatus | null>(null)
   const [serverStatuses, setServerStatuses] = useState<Record<string, ServerStatus>>({})
   const [serverLoading, setServerLoading] = useState<Record<string, boolean>>({})
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null)
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    initialProjectId ?? null,
+  )
   const [sessions, setSessions] = useState<GlyphSession[]>([])
   const [isCreatingSession, setIsCreatingSession] = useState(false)
   const [sessionsLoading, setSessionsLoading] = useState(false)

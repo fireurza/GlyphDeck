@@ -1,100 +1,31 @@
 # GlyphDeck
 
-GlyphDeck is a local web workspace for managing projects, detecting OpenCode, and running per-project OpenCode servers.
+GlyphDeck is a local-first web workspace for managing projects, detecting OpenCode, running per-project OpenCode servers, streaming transcripts, reviewing changes, tracking usage, handling permissions, and using an interactive terminal — all from a browser UI.
 
-## Milestone 1 — Project Registry
+## POC Capabilities (M0–M10)
 
-Milestone 1 adds a local project registry backed by a JSON file. The left Projects panel can add a local directory, show whether it is a Git repository, show the current branch when available, persist the entry across backend restarts, and remove the entry.
-
-Registry data is stored at:
-
-```text
-.glyphdeck/projects.json
-```
-
-`.glyphdeck/` is local development data and is ignored by Git.
-
-## Milestone 2 — OpenCode Server Manager
-
-Milestone 2 adds OpenCode CLI detection and per-project server lifecycle management. Each registered project can start and stop an `opencode serve` instance bound to a dynamic loopback port.
-
-Server state is tracked in memory (not persisted across GlyphDeck restarts).
-
-## Milestone 3 — Sessions and Prompt Loop
-
-Milestone 3 adds OpenCode session management and a non-streaming prompt loop. Registered projects with a ready OpenCode server can create sessions, send prompts, and view assistant responses in the center panel.
-
-Streaming (SSE/EventBridge) starts in Milestone 4. This milestone uses request/response only.
-
-## Milestone 4 — EventBridge Streaming
-
-Milestone 4 adds live streaming from OpenCode to the browser. The backend connects to OpenCode's `/event` SSE stream as a long-lived connection, normalizes events, and fans them out to browser clients over `GET /api/events` (also SSE). The frontend connects as soon as a project is selected (independent of session selection) and shows connection status (`Live` / `Reconnecting` / `Offline` / `Error`) in the top bar. The session transcript updates directly from streamed `message.part.updated` / `message.part.delta` events — the non-streaming fetch from Milestone 3 remains only as a reconciliation fallback, not as the primary path.
-
-## Milestone 5 — Agent Terminal
-
-Milestone 5 adds a read-only Agent Terminal view in the bottom panel, populated live from the same Milestone 4 event stream, plus a fix for a layout defect carried forward from Milestone 4.
-
-**Stop Server / session list layout fix:** with many sessions in a project, a flex-layout bug could collapse the project card's controls (including Stop Server) to a 0px box while their content still rendered visually — placing the session list on top of the Stop Server button and making it unclickable without `{ force: true }`. Fixed by preventing the project list from being flex-shrunk and giving the session list its own bounded, independently-scrolling region.
-
-**Agent Terminal behavior:**
-
-- Read-only. There is no interactive input, no shell execution, and no command entry — it only displays activity already happening in the active OpenCode session.
-- Populated entirely from the existing browser event stream (`GET /api/events`); no new backend endpoint was added. All the event types the Agent Terminal needs (`session.updated`, `message.updated`, `message.part.updated`, `message.part.delta`, `session.next.step.*`, `session.next.tool.*`, `session.next.shell.*`, `permission.*`, plus the `glyphdeck.eventstream.*` connection signals) already flow through that stream with a `sessionID` GlyphDeck can filter on. Adding a second backend log/endpoint would have duplicated state the browser already has live — so it was skipped.
-- The event log is bounded in the browser (last 300 rows) and resets when the selected project/session changes, so it never shows another session's activity and never grows unbounded.
-- High-volume text-streaming events (`message.part.delta`, `message.part.updated`) collapse into a single updating row per message instead of adding a row per token/chunk.
-- Basic category filters (All / Tool / Shell / Message / Permission / System) and a Clear button are available.
-- **User PTY terminal is not implemented yet.** The bottom panel's "Terminal" tab remains a placeholder; interactive shell access is out of scope until a later milestone.
-
-## Milestone 6 — Usage Tab
-
-Milestone 6 adds a functional Usage tab in the right panel. Usage data is aggregated from OpenCode assistant messages by the backend and served through a dedicated endpoint.
-
-**Usage data source:**
-
-- `GET /session/{id}/message` — the backend walks assistant messages in reverse to find the last one with token/cost data.
-- Assistant messages carry `info.providerID`, `info.modelID`, `info.agent`, `info.mode`, `info.cost`, and `info.tokens` (total, input, output, reasoning, cache read/write).
-
-**Usage endpoint:**
-
-```
-GET /api/projects/{projectId}/sessions/{sessionId}/usage
-```
-
-Response shape matches the OpenCode assistant message info fields:
-```json
-{
-  "providerID": "deepseek",
-  "modelID": "deepseek-v4-pro",
-  "agent": "build",
-  "mode": "build",
-  "cost": 0.009337275,
-  "tokens": {
-    "total": 23329,
-    "input": 21369,
-    "output": 8,
-    "reasoning": 32,
-    "cache": { "read": 1920, "write": 0 }
-  },
-  "messageCount": 2
-}
-```
-
-**Usage tab behavior:**
-
-- Shows empty state when no session is selected.
-- Shows loading state while fetching.
-- Shows error state if usage fetch fails.
-- Displays provider, model, agent, mode, token breakdown, cost, and message count.
-- Missing fields render as an em-dash (`—`).
-- Manual Refresh button available.
-- Cost is shown as USD with up to 6 decimal places for small values.
-- Reasoning tokens row is only shown when non-zero.
+| Milestone | Feature | Status |
+|---|---|---|
+| M0 | Repo bootstrap (Go backend + React/Vite shell) | Accepted |
+| M1 | Project registry (add/list/delete, JSON persistence, Git detection) | Accepted |
+| M2 | OpenCode server manager (detect/start/stop, health check, port allocation) | Accepted |
+| M3 | Sessions and prompt loop (create/list, send prompt, view transcript) | Accepted |
+| M3.5 | Validation harness hardening (data-testid, dev endpoints, controlled scripts) | Accepted |
+| M4 | EventBridge streaming (SSE from OpenCode to browser, live transcript) | Accepted |
+| M5 | Agent Terminal (read-only tool/event history, category filters) | Accepted |
+| M6 | Usage tab (token/cost aggregation, available/unavailable states) | Accepted |
+| M7 | Review tab (project/Git/session/activity summary) | Accepted |
+| M8 | Permissions (approval popup with once/always/reject) | Accepted |
+| M9 | User Terminal (interactive shell in project cwd) | Accepted |
+| M10 | POC hardening (browser refresh, problems tab, graceful shutdown, docs) | Accepted |
 
 ## Prerequisites
 
-- [Go](https://go.dev/dl/) (1.23+)
-- [Node.js](https://nodejs.org/) (20+) with npm
-- [OpenCode](https://opencode.ai) CLI (`opencode` on PATH) for server management
+- [Go](https://go.dev/dl/) 1.23+
+- [Node.js](https://nodejs.org/) 20+ with npm
+- [OpenCode](https://opencode.ai) CLI (`opencode` on PATH)
+- [Git](https://git-scm.com/)
+- [PowerShell 7](https://github.com/PowerShell/PowerShell) (for validation scripts on Windows)
 
 OpenCode server communication uses HTTP Basic Auth credentials from environment variables:
 
@@ -125,117 +56,176 @@ cd web && npm run dev
 
 Starts Vite dev server (default: `http://localhost:5173`).
 
-## Project Registry API
+## Validation
+
+### Quick validation
+
+```powershell
+go test ./...
+cd web && npm run build
+```
+
+### Full POC smoke test (M10)
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\run-m10-smoke.ps1
+```
+
+All validation artifacts are stored under `.glyphdeck/validation/<milestone>/` (git-ignored):
+
+```
+.glyphdeck/validation/m10/
+├── logs/
+├── screenshots/
+├── scripts/
+├── pids/
+└── workspace/
+```
+
+## API Reference
+
+### Project Registry
 
 - `GET /api/projects` — list registered projects.
 - `POST /api/projects` — add a local project path.
 - `GET /api/projects/{projectId}` — get one registered project.
 - `DELETE /api/projects/{projectId}` — remove one registered project.
 
-## OpenCode Server API
+### OpenCode Server
 
 - `GET /api/opencode` — detect OpenCode CLI and version.
-- `GET /api/projects/{projectId}/server` — get server status for a project.
+- `GET /api/projects/{projectId}/server` — get server status.
 - `POST /api/projects/{projectId}/server/start` — start an OpenCode server.
 - `POST /api/projects/{projectId}/server/stop` — stop an OpenCode server.
 
-OpenCode servers bind to `127.0.0.1` only. Ports are allocated dynamically. Health checks use OpenCode's `/global/health` endpoint.
+### Sessions
 
-## Session API
-
-- `GET /api/projects/{projectId}/sessions` — list OpenCode sessions for a project.
-- `POST /api/projects/{projectId}/sessions` — create a new OpenCode session.
+- `GET /api/projects/{projectId}/sessions` — list OpenCode sessions.
+- `POST /api/projects/{projectId}/sessions` — create a new session.
 - `GET /api/projects/{projectId}/sessions/{sessionId}` — get session details.
-- `GET /api/projects/{projectId}/sessions/{sessionId}/messages` — list messages in a session.
-- `POST /api/projects/{projectId}/sessions/{sessionId}/prompt` — send a non-streaming prompt and receive the response.
-- `GET /api/projects/{projectId}/sessions/{sessionId}/usage` — get aggregated token usage and cost for a session.
+- `GET /api/projects/{projectId}/sessions/{sessionId}/messages` — list messages.
+- `POST /api/projects/{projectId}/sessions/{sessionId}/prompt` — send a prompt.
 
-The project's OpenCode server must be in `ready` state. Session/message data is sourced from the OpenCode server, not persisted in GlyphDeck.
+### Usage
+
+- `GET /api/projects/{projectId}/sessions/{sessionId}/usage` — aggregated token usage and cost.
+
+### Review
+
+- `GET /api/projects/{projectId}/sessions/{sessionId}/review` — project/Git/session/activity summary.
+
+### Permissions
+
+- `GET /api/permissions?projectId={id}` — list pending permission requests.
+- `POST /api/permissions/{requestId}/reply?projectId={id}` — reply once/always/reject.
+
+### User Terminal
+
+- `POST /api/projects/{projectId}/terminals` — start a terminal.
+- `GET /api/terminals/{terminalId}/stream` — SSE output stream.
+- `POST /api/terminals/{terminalId}/input` — send input.
+- `POST /api/terminals/{terminalId}/resize` — resize (no-op on Windows pipes).
+- `POST /api/terminals/{terminalId}/close` — close terminal.
+- `GET /api/terminals/{terminalId}/status` — get terminal status.
+
+### Problems
+
+- `GET /api/problems` — list app-level problems.
+- `POST /api/problems/clear` — clear all problems.
+
+### Events
+
+- `GET /api/events` — SSE event stream from OpenCode to browser.
+
+### Dev/Test (requires `GLYPHDECK_DEV_TOOLS=1`)
+
+- `POST /api/dev/reset-validation-state` — reset validation state.
+- `POST /api/dev/stop-all-app-owned-servers` — stop app-owned servers.
 
 ## Manual Smoke Test
 
 Shell: PowerShell 7
 Working directory: project root
 
-1. Start backend:
-
-   ```powershell
-   go run ./cmd/glyphdeck
-   ```
-
-2. Start frontend in a second terminal:
-
-   ```powershell
-   cd web && npm run dev
-   ```
-
+1. Start backend: `go run ./cmd/glyphdeck`
+2. Start frontend in second terminal: `cd web && npm run dev`
 3. Add the current GlyphDeck repo path in the left Projects panel.
 4. Confirm the project appears with Git repo status and branch.
 5. Confirm OpenCode detection banner shows ready with version.
 6. Click Start Server.
 7. Confirm server reaches ready with port and version displayed.
-8. Click the project to select it (sessions list appears).
+8. Click the project to select it (sessions list appears, event stream connects).
 9. Click Create Session.
 10. Click the new session to open it in the center panel.
 11. Type a prompt (e.g., "List the validation commands from README.") and click Send.
 12. Confirm the assistant response appears in the transcript.
-13. Open the **Agent Terminal** tab in the bottom panel and confirm live event rows appear for the active session (session/message updates, streamed text, tool/shell events if the prompt triggered any).
-14. Click Clear in the Agent Terminal and confirm the visible rows are removed.
-15. Open the **Usage** tab in the right panel and confirm provider/model/token/cost data appears.
-16. Click Refresh in the Usage tab and confirm the panel does not error.
-17. Click Stop Server (no force-click needed).
-18. Confirm server stops.
+13. Open the Agent Terminal tab and confirm live event rows appear.
+14. Open the Usage tab and confirm provider/model/token/cost data appears.
+15. Open the Review tab and confirm project/Git/session/activity data appears.
+16. Force a bash permission rule or use your project config to trigger permission popup; confirm popup appears and can be approved.
+17. Open the Terminal tab, click Start Terminal, send commands, confirm output.
+18. Click Stop Server (no force-click needed).
+19. Confirm server stops.
+20. Open the Problems tab and confirm "No problems detected." is shown.
+21. Refresh the browser and confirm the selected project is restored.
 
 ## Known Limitations
 
-- User-controlled terminal (PTY + xterm.js) is not implemented. The bottom panel's Terminal tab is a placeholder.
-- Agent Terminal shows only live activity from the moment it starts listening; it does not backfill history from before a session was selected.
-- Usage tab shows data from the latest assistant message only; it does not show per-message or cumulative session totals.
-- Usage data availability depends on OpenCode's assistant message shape. If OpenCode omits token/cost fields, the backend returns what it can and the UI shows em-dashes for missing values.
-- Permissions approval popup and Review tab data are not implemented yet (later milestones).
+- **No auth.** GlyphDeck binds to 127.0.0.1 only. Do not expose to public networks.
+- **No SQLite.** Project registry is stored as JSON under `.glyphdeck/projects.json`.
+- **No LAN/Tailscale binding.** Only localhost access.
+- **No installer.** Run via `go run` and `npm run dev`.
+- **Terminal is pipe-based on Windows.** True PTY (ConPTY) is blocked with current Go libraries. The terminal uses `os/exec` with pipes — interactive shell works but no TTY resize, no signals.
+- **Agent Terminal shows only live activity.** Does not backfill history from before session selection.
+- **Usage tab shows latest assistant message only.** Not per-message or cumulative totals.
+- **Review tab uses local `git` commands for file status.** No OpenCode VCS API integration yet.
+- **Permissions polling is interval-based (2s).** SSE events for live permission updates are available but not yet wired to dismiss popups automatically.
+- **Problems tab tracks up to 100 app-level issues.** Older problems are evicted.
 
-## Validation Commands
+## Troubleshooting
 
-Shell: PowerShell 7
-Working directory: project root
+### OpenCode not detected
 
 ```powershell
-go test ./...
-cd web && npm run build
-go run ./cmd/glyphdeck
-cd web && npm run dev
+opencode --version
 ```
 
-## Stopping Dev Servers
+If not found, ensure OpenCode is installed and on PATH.
 
-**Normal stop:**
-
-- Press `Ctrl+C` in the terminal running `go run ./cmd/glyphdeck` to stop the backend.
-- Press `Ctrl+C` in the terminal running `npm run dev` to stop the frontend.
-
-**Kill stuck port (Windows):**
-
-If a server process is left running and the port is stuck:
+### Server stuck
 
 ```powershell
 # Kill stuck backend on port 8756
-$glyphdeckPortProcess = Get-NetTCPConnection -LocalPort 8756 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
-Stop-Process -Id $glyphdeckPortProcess -Force
+$p = Get-NetTCPConnection -LocalPort 8756 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
+Stop-Process -Id $p -Force
 
-# Kill stuck frontend on port 5173 (adjust port if Vite uses another)
-$vitePortProcess = Get-NetTCPConnection -LocalPort 5173 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
-Stop-Process -Id $vitePortProcess -Force
-
-# Kill stuck OpenCode processes (if left running by GlyphDeck)
-Get-Process opencode -ErrorAction SilentlyContinue | Stop-Process -Force
+# Kill stuck frontend on port 5173
+$p = Get-NetTCPConnection -LocalPort 5173 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess
+Stop-Process -Id $p -Force
 ```
 
-**Linux/macOS:**
+### Event stream offline
 
-```bash
-# Backend
-lsof -ti:8756 | xargs kill -9
+1. Ensure the OpenCode server is running (check server status in left panel).
+2. Ensure `OPENCODE_SERVER_PASSWORD` is set in the environment.
+3. Check the Problems tab for any app-level errors.
 
-# Frontend
-lsof -ti:5173 | xargs kill -9
-```
+### Terminal closed/detached after refresh
+
+Terminal sessions are not reattachable after browser refresh. Start a new terminal.
+
+### Validation artifacts
+
+All validation logs, screenshots, PIDs, and workspaces are stored under `.glyphdeck/validation/<milestone>/`. This directory is git-ignored.
+
+## Logs
+
+Backend logs are written to stderr (visible in the terminal running `go run ./cmd/glyphdeck`). Key operations logged:
+
+- Server startup/shutdown
+- OpenCode server start/stop
+- Terminal start/close
+- Permission replies
+- App-level problems
+
+Validation harness logs are stored under `.glyphdeck/validation/<milestone>/logs/`.

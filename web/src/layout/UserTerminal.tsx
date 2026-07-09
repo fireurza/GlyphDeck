@@ -25,15 +25,26 @@ function UserTerminal({ selectedProjectId }: UserTerminalProps) {
 
   const appendOutput = useCallback((text: string) => {
     outputBufferRef.current += text
-    // Flush on newlines for responsiveness.
+    // Flush on newlines or when buffer exceeds threshold.
     if (text.includes('\n') || outputBufferRef.current.length > 2000) {
-      setOutputLines((prev) => {
-        const lines = outputBufferRef.current.split('\n')
-        outputBufferRef.current = lines.pop() || ''
-        return [...prev, ...lines]
-      })
+      flushBuffer()
     }
   }, [])
+
+  const flushBuffer = useCallback(() => {
+    if (!outputBufferRef.current) return
+    setOutputLines((prev) => {
+      const lines = outputBufferRef.current.split('\n')
+      outputBufferRef.current = lines.pop() || ''
+      return [...prev, ...lines]
+    })
+  }, [])
+
+  /* Periodic flush for terminal output without newlines. */
+  useEffect(() => {
+    const interval = setInterval(() => flushBuffer(), 500)
+    return () => clearInterval(interval)
+  }, [flushBuffer])
 
   /* Auto-scroll. */
   useEffect(() => {
