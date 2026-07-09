@@ -1,76 +1,75 @@
 # GlyphDeck Validation Harness
 
-Purpose: Controlled, deterministic, repo-local validation harness for GlyphDeck. Runs start/stop/smoke flows without visible windows, global process kills, or fragile selectors.
+Controlled, deterministic, repo-local validation for GlyphDeck. It runs hidden
+start/stop/smoke flows without global process kills, visible editor windows, or
+fragile browser selectors.
 
 ## Scripts
 
 | Script | Purpose |
 |---|---|
-| `start-dev.ps1` | Start Go backend and Vite frontend as hidden PS background jobs |
-| `stop-dev.ps1` | Stop dev servers using only recorded PIDs; never kills by name |
-| `run-m3-smoke.ps1` | Full Milestone 3 smoke test: start, reset state, Playwright run, stop |
+| `start-dev.ps1` / `stop-dev.ps1` | Legacy M3.5 development harness, tracked PID cleanup only |
+| `run-m3-smoke.ps1` | Historical M3 smoke |
+| `start-dev-mvp.ps1` / `stop-dev-mvp.ps1` | Isolated v0.1.0 release-binary lifecycle |
+| `run-mvp-smoke.ps1` | v0.1.0 release-candidate smoke: start, browser checks, screenshots, teardown |
 
-## Usage
+## v0.1.0 Usage
+
+The release binary embeds `web/dist`, so build the frontend before every Go
+compile or test that imports the `web` package.
 
 ```powershell
-# Start dev servers
-.\scripts\validation\start-dev.ps1
-
-# Run M3 smoke test (starts servers, runs Playwright, stops servers)
-.\scripts\validation\run-m3-smoke.ps1
-
-# Stop dev servers (PID-based cleanup only)
-.\scripts\validation\stop-dev.ps1
+npm.cmd --prefix web run build
+go test ./... -count=1
+go vet ./cmd/... ./internal/... ./web
+go build -o .\dist\glyphdeck.exe .\cmd\glyphdeck\
+pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\run-mvp-smoke.ps1
 ```
 
-## Artifact Layout
+The MVP runner launches the binary from `.glyphdeck/validation/mvp/launch/`,
+not the repository root, to prove the frontend is embedded. Generated artifacts
+remain under `.glyphdeck/validation/mvp/` (git-ignored):
 
-All artifacts live under `.glyphdeck/validation/m3_5/` (gitignored):
-
-```
-.glyphdeck/validation/m3_5/
+```text
+.glyphdeck/validation/mvp/
+├── data/
+├── launch/
 ├── logs/
-│   ├── backend.log
-│   └── frontend.log
+├── pids/
 ├── screenshots/
-│   ├── 01-clean-state.png
-│   ├── 02-project-added.png
-│   ├── 03-server-ready.png
-│   ├── 04-session-created.png
-│   ├── 05-prompt-sent.png
-│   ├── 06-assistant-response-visible.png
-│   ├── 07-server-stopped.png
-│   └── 08-full-layout.png
 ├── scripts/
-│   └── smoke-test.cjs
-└── pids/
-    ├── backend.pid
-    └── frontend.pid
+└── workspace/
 ```
 
 ## Safety Rules (Non-Negotiable)
 
-- **PID-based cleanup only** — `stop-dev.ps1` reads `.pid` files and stops only those exact PIDs.
-- **Never** `Get-Process -Name` or `Stop-Process -Name`.
-- **Never** `taskkill /IM`.
-- **Never** open visible windows (Notepad, Explorer, VS Code, cmd.exe).
-- **Never** kill OpenCode Desktop or global processes.
-- **Never** write artifacts to `%TEMP%` or outside `.glyphdeck/validation/`.
-- **Playwright selectors** — `data-testid` only; no `text=`, `has-text`, `.first()`, `.nth()`, or CSS-only selectors.
+- PID-based cleanup only. Teardown verifies the recorded binary path and dynamic
+  port ownership before stopping a process.
+- No process-name/global kills, `taskkill /IM`, or OpenCode Desktop changes.
+- Recursive validation-data cleanup verifies lexical containment and rejects any
+  reparse point/junction in the path ancestry before deletion.
+- No visible editor, Explorer, cmd, or other interactive windows. The MVP runner
+  snapshots existing Notepad PIDs solely to detect and close a Notepad process
+  created during that run; it never touches pre-existing Notepad processes.
+- Use `npm.cmd` in Windows scripts. Do not use `npx`, `npm exec`, npm.ps1, or
+  npx.ps1.
+- Browser automation uses stable `data-testid` selectors only; no text, CSS,
+  positional, `.first()`, or `.nth()` selectors.
+- Logs, screenshots, PID records, workspaces, and validation data stay under
+  `.glyphdeck/validation/` and are never committed.
 
 ## Dev/Test Endpoints
 
 When `GLYPHDECK_DEV_TOOLS=1` is set:
 
-- `POST /api/dev/reset-validation-state` — resets validation state for a clean smoke test.
-- `POST /api/dev/stop-all-app-owned-servers` — stops only GlyphDeck-tracked server processes.
+- `POST /api/dev/reset-validation-state` — reset validation state for a clean smoke.
+- `POST /api/dev/stop-all-app-owned-servers` — stop only GlyphDeck-tracked servers.
 
-These endpoints are guarded; they do not exist when `GLYPHDECK_DEV_TOOLS` is unset.
+These endpoints do not exist when `GLYPHDECK_DEV_TOOLS` is unset.
 
 ## Prerequisites
 
 - Go 1.23+
-- Node.js 20+ with npm
-- Playwright (`npm install playwright` in the repo or globally)
+- Node.js 20+ with npm and Playwright available to the repository
 - PowerShell 7
-- OpenCode CLI on PATH (for server management)
+- OpenCode CLI on PATH (for server-management checks)

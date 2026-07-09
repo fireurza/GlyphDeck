@@ -3,15 +3,14 @@
 
 set -e
 
-echo "=== Building Go backend ==="
-go build -o bin/glyphdeck ./cmd/glyphdeck
-
 echo "=== Building frontend ==="
 cd web
 npm install
 npm run build
 cd ..
 
+echo "=== Building Go backend ==="
+go build -o bin/glyphdeck ./cmd/glyphdeck
+
 echo "=== Build complete ==="
-echo "Backend: bin/glyphdeck"
-echo "Frontend: web/dist/"
+echo "Binary: bin/glyphdeck"

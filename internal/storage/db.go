@@ -16,9 +16,19 @@ type DB struct {
 	path string
 }
 
+// DataDir returns the directory used for GlyphDeck-owned persistent data.
+// GLYPHDECK_DATA_DIR is intended for controlled validation and isolated runs;
+// normal application runs continue to use the repo-local .glyphdeck directory.
+func DataDir() string {
+	if path := os.Getenv("GLYPHDECK_DATA_DIR"); path != "" {
+		return path
+	}
+	return ".glyphdeck"
+}
+
 // DefaultDBPath returns the default SQLite database path.
 func DefaultDBPath() string {
-	return filepath.Join(".glyphdeck", "glyphdeck.db")
+	return filepath.Join(DataDir(), "glyphdeck.db")
 }
 
 // Open initializes the SQLite database, creating it if needed.

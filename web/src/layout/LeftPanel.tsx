@@ -264,7 +264,7 @@ function LeftPanel({ initialProjectId, onSelectProject, onSelectSession }: LeftP
   return (
     <aside className="left-panel">
       <div className="panel-header">Projects</div>
-      <div className="panel-body projects-panel">
+      <div className="panel-body projects-panel" data-testid="left-panel-body">
         <form className="project-form" onSubmit={handleSubmit}>
           <div className="project-form__field">
             <label htmlFor="project-name">Name</label>
@@ -479,7 +479,7 @@ function LeftPanel({ initialProjectId, onSelectProject, onSelectSession }: LeftP
             ) : (
               <ul className="session-list">
                 {sessions.map((session) => (
-                  <li key={session.id}>
+                  <li key={session.id} data-testid={`session-item-${session.id}`}>
                     <button
                       className="session-item"
                       type="button"

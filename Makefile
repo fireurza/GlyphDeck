@@ -11,15 +11,15 @@ dev:
 	@echo "  make dev-backend"
 	@echo "  make dev-frontend"
 
-build-backend:
+build-backend: build-frontend
 	go build -o bin/glyphdeck.exe ./cmd/glyphdeck
 
 build-frontend:
 	cd web && npm run build
 
-build: build-backend build-frontend
+build: build-backend
 
-test:
+test: build-frontend
 	go test ./...
 
 clean:

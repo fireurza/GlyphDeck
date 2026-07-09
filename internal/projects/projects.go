@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -76,12 +77,12 @@ func (r *Registry) Close() error {
 }
 
 func DefaultStoragePath() string {
-	return filepath.Join(".glyphdeck", "glyphdeck.db")
+	return storage.DefaultDBPath()
 }
 
 // LegacyStoragePath returns the path to the old JSON projects file.
 func LegacyStoragePath() string {
-	return filepath.Join(".glyphdeck", "projects.json")
+	return filepath.Join(storage.DataDir(), "projects.json")
 }
 
 // List returns all registered projects.
@@ -237,7 +238,7 @@ func (r *Registry) listLocked(ctx context.Context) ([]Project, error) {
 func scanProject(row interface{ Scan(...interface{}) error }) (Project, error) {
 	var (
 		id, name, path, tagsJSON, gitBranch, createdAt, updatedAt string
-		trusted, gitIsRepo                                         int
+		trusted, gitIsRepo                                        int
 	)
 	err := row.Scan(&id, &name, &path, &trusted, &tagsJSON, &gitIsRepo, &gitBranch, &createdAt, &updatedAt)
 	if err != nil {
@@ -314,6 +315,9 @@ func normalizePath(raw string) (string, error) {
 	if trimmed == "" {
 		return "", ErrMissingPath
 	}
+	if runtime.GOOS == "windows" && isWindowsNetworkPath(trimmed) {
+		return "", ErrUnsupportedPath
+	}
 
 	evaluated, err := filepath.EvalSymlinks(trimmed)
 	if err != nil {
@@ -337,6 +341,17 @@ func normalizePath(raw string) (string, error) {
 	}
 
 	return abs, nil
+}
+
+func isWindowsNetworkPath(path string) bool {
+	if len(path) < 2 {
+		return false
+	}
+	return isWindowsPathSeparator(path[0]) && isWindowsPathSeparator(path[1])
+}
+
+func isWindowsPathSeparator(character byte) bool {
+	return character == '\\' || character == '/'
 }
 
 // nextID generates a stable project ID from name and path.

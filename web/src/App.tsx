@@ -1,10 +1,11 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import TopBar from './layout/TopBar'
 import ActivityRail from './layout/ActivityRail'
 import LeftPanel from './layout/LeftPanel'
 import CenterPanel from './layout/CenterPanel'
 import RightPanel from './layout/RightPanel'
 import BottomPanel from './layout/BottomPanel'
+import SettingsPanel from './layout/SettingsPanel'
 import { useEventStream } from './api/events'
 import './styles/layout.css'
 
@@ -18,6 +19,57 @@ function writeLS(key: string, value: string | null) {
   try { if (value) localStorage.setItem(key, value); else localStorage.removeItem(key) } catch {}
 }
 
+interface SettingsDialogProps {
+  onClose: () => void
+}
+
+function SettingsDialog({ onClose }: SettingsDialogProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+
+    if (!dialog.open) dialog.showModal()
+    closeButtonRef.current?.focus()
+
+    return () => {
+      if (dialog.open) dialog.close()
+    }
+  }, [])
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="settings-dialog"
+      aria-label="Settings"
+      onCancel={(event) => {
+        event.preventDefault()
+        onClose()
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      data-testid="settings-dialog"
+    >
+      <div className="settings-dialog__content">
+        <button
+          ref={closeButtonRef}
+          type="button"
+          className="settings-dialog__close"
+          onClick={onClose}
+          aria-label="Close settings"
+          data-testid="settings-close-button"
+        >
+          ×
+        </button>
+        <SettingsPanel />
+      </div>
+    </dialog>
+  )
+}
+
 function App() {
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     () => readLS(LS_PROJECT_KEY),
@@ -25,6 +77,8 @@ function App() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(
     () => readLS(LS_SESSION_KEY),
   )
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const { status: eventStreamStatus, latestEvent } = useEventStream(selectedProjectId)
 
   const handleSelectProject = useCallback((projectId: string) => {
@@ -41,11 +95,20 @@ function App() {
     writeLS(LS_SESSION_KEY, sessionId)
   }, [])
 
+  const closeSettings = useCallback(() => {
+    setSettingsOpen(false)
+    window.requestAnimationFrame(() => settingsTriggerRef.current?.focus())
+  }, [])
+
   return (
     <div className="glyphdeck-shell" data-testid="app-shell">
       <TopBar eventStreamStatus={eventStreamStatus} />
       <div className="glyphdeck-main">
-        <ActivityRail />
+        <ActivityRail
+          onOpenSettings={() => setSettingsOpen(true)}
+          settingsOpen={settingsOpen}
+          settingsButtonRef={settingsTriggerRef}
+        />
         <LeftPanel
           initialProjectId={selectedProjectId}
           initialSessionId={selectedSessionId}
@@ -69,6 +132,7 @@ function App() {
         eventStreamStatus={eventStreamStatus}
         latestEvent={latestEvent}
       />
+      {settingsOpen && <SettingsDialog onClose={closeSettings} />}
     </div>
   )
 }

@@ -72,9 +72,12 @@ function SettingsPanel() {
           </p>
         )}
         <div className="settings-group">
-          <label className="settings-label">OpenCode Binary Path</label>
+          <label className="settings-label" htmlFor="settings-opencode-path">
+            OpenCode Binary Path
+          </label>
           <input
             className="settings-input"
+            id="settings-opencode-path"
             type="text"
             value={settings['opencode_path'] || ''}
             onChange={(e) => updateField('opencode_path', e.target.value)}
@@ -84,9 +87,12 @@ function SettingsPanel() {
           <p className="settings-hint">Override the path to the OpenCode executable.</p>
         </div>
         <div className="settings-group">
-          <label className="settings-label">Default Project Directory</label>
+          <label className="settings-label" htmlFor="settings-default-project-dir">
+            Default Project Directory
+          </label>
           <input
             className="settings-input"
+            id="settings-default-project-dir"
             type="text"
             value={settings['default_project_dir'] || ''}
             onChange={(e) => updateField('default_project_dir', e.target.value)}
@@ -96,9 +102,12 @@ function SettingsPanel() {
           <p className="settings-hint">Default directory when adding new projects.</p>
         </div>
         <div className="settings-group">
-          <label className="settings-label">Log Level</label>
+          <label className="settings-label" htmlFor="settings-log-level">
+            Log Level
+          </label>
           <select
             className="settings-input"
+            id="settings-log-level"
             value={settings['log_level'] || 'info'}
             onChange={(e) => updateField('log_level', e.target.value)}
             data-testid="settings-log-level"
