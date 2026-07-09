@@ -1433,3 +1433,84 @@
   font-size: var(--font-size-sm);
   color: var(--color-text);
 }
+
+/* Settings Panel */
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.settings-panel__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.settings-panel__title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-panel__save-btn {
+  padding: 4px 12px;
+  border: 1px solid var(--color-accent);
+  border-radius: 4px;
+  background: var(--color-accent);
+  color: #fff;
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-family: inherit;
+}
+
+.settings-panel__save-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.settings-group {
+  margin-bottom: 16px;
+}
+
+.settings-label {
+  display: block;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.settings-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  background: var(--color-bg-secondary);
+  color: var(--color-text);
+  font-family: inherit;
+  font-size: var(--font-size-sm);
+}
+
+.settings-input:focus {
+  border-color: var(--color-accent);
+  outline: none;
+}
+
+.settings-hint {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+
+.settings-message {
+  font-size: var(--font-size-sm);
+  color: var(--color-accent);
+  margin-bottom: 12px;
+}
