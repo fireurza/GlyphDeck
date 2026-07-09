@@ -19,7 +19,7 @@ Start-Job -Name "glyphdeck-m10-backend" -ScriptBlock { param($exe,$log,$port) $e
 $bpid=$null; for ($i=1;$i -le 20;$i++) { try { $r=Invoke-WebRequest -Uri "http://127.0.0.1:${bp}/healthz" -Method GET -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop; if ($r.StatusCode -eq 200) { $c=Get-NetTCPConnection -LocalPort $bp -State Listen -ErrorAction SilentlyContinue|Select -First 1; if ($c){$bpid=$c.OwningProcess}; break } } catch {}; Start-Sleep -Milliseconds 500 }
 if ($bpid) { $bpid|Out-File (Join-Path $pidDir "backend.pid") -NoNewline -Encoding ASCII; Write-Host "[backend] PID $bpid" }
 Write-Host "[frontend] Starting..."
-Start-Job -Name "glyphdeck-m10-frontend" -ScriptBlock { param($dir,$log) Set-Location $dir; cmd /c npm run dev >> $log 2>&1 } -Arg (Join-Path $repoRoot "web"),$frontendLog | Out-Null
+Start-Job -Name "glyphdeck-m10-frontend" -ScriptBlock { param($dir,$log) Set-Location $dir; & cmd.exe /c "npm.cmd run dev" >> $log 2>&1 } -Arg (Join-Path $repoRoot "web"),$frontendLog | Out-Null
 $fpid=$null; for ($i=1;$i -le 20;$i++) { $c=Get-NetTCPConnection -LocalPort $fp -State Listen -ErrorAction SilentlyContinue|Select -First 1; if ($c){$fpid=$c.OwningProcess; Write-Host "[frontend] Port listening (attempt $i)"; break }; Start-Sleep -Milliseconds 500 }
 if ($fpid) { $fpid|Out-File (Join-Path $pidDir "frontend.pid") -NoNewline -Encoding ASCII; Write-Host "[frontend] PID $fpid" }
 Write-Host "=== Servers started ==="

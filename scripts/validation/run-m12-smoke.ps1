@@ -11,6 +11,10 @@ Write-Host "=== GlyphDeck M12 State Model Cleanup Smoke ==="
 $env:GLYPHDECK_DEV_TOOLS = "1"
 New-Item -ItemType Directory -Path $logDir,$screenshotDir,$pidDir,$scriptsRuntimeDir -Force | Out-Null
 Get-ChildItem -LiteralPath $screenshotDir -Filter "*.png" -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
+
+# Snapshot existing notepad.exe PIDs before smoke — forbid new ones after.
+$notepadBefore = (Get-Process -Name "notepad" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+
 Write-Host "[harness] Starting M12 dev servers..."
 & (Join-Path $scriptDir "start-dev-m12.ps1")
 $cs = Join-Path $scriptDir "m12-smoke.cjs"
@@ -21,5 +25,18 @@ $result | ForEach-Object { Write-Host $_ }
 if ($exit -eq 0) { Write-Host "[playwright] PASS" } else { Write-Host "[playwright] FAIL ($exit)" }
 Write-Host "[harness] Stopping..."
 & (Join-Path $scriptDir "stop-dev-m12.ps1")
+
+# Forbidden-host-action guard: no new notepad.exe processes.
+$notepadAfter = (Get-Process -Name "notepad" -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id)
+$newNotepad = $notepadAfter | Where-Object { $_ -notin $notepadBefore }
+if ($newNotepad) {
+  Write-Host "[guard] WARNING: New notepad.exe PID(s) detected: $($newNotepad -join ', ')"
+  Write-Host "[guard] This indicates a file-association problem (e.g. npx.ps1 opened in Notepad)."
+  Write-Host "[guard] Closing only the newly spawned Notepad process(es)."
+  $newNotepad | ForEach-Object { try { Stop-Process -Id $_ -Force -ErrorAction Stop } catch {} }
+  Write-Host "[guard] Forbidden host action: FAIL"
+  $exit = 1
+}
+
 if ($exit -eq 0) { Write-Host "Result: PASS" } else { Write-Host "Result: FAIL" }
 exit $exit

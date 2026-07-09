@@ -49,7 +49,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 9 — User Terminal | Accepted | 4473bab | Interactive shell via exec.Command pipes (PTY unsupported on Windows with current stack); SSE output streaming; HTTP POST input; start/run/close verified; layout preserved |
 | Milestone 10 — POC hardening | Accepted | 96715c5 | Browser refresh preserves project state (localStorage); graceful shutdown stops app-owned servers/terminals; Problems tab with bounded ring buffer; terminal output timer-based flush; complete README docs |
 | Milestone 11 — SQLite persistence | Accepted | 09c23ee | Project registry backed by SQLite (modernc.org/sqlite, pure Go); JSON migration on first startup; project data survives backend restart; all M10 regressions clean |
-| Milestone 12 — State model cleanup | Accepted | a905eb6 | Sessions auto-load when project becomes ready (browser refresh, server start); event stream shows Offline not Error after intentional stop; session creation works after refresh |
+| Milestone 12 — State model cleanup | Accepted | a905eb6 | Sessions auto-load when project becomes ready (browser refresh, server start); event stream shows Offline not Error after intentional stop; session creation works after refresh; validation corrected (vision review + Notepad/npx.ps1 guard) |
 
 ---
 

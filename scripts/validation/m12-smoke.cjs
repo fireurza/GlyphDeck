@@ -102,16 +102,7 @@ async function run(){
     try{await page.waitForSelector('[data-testid="session-item"]',{timeout:15000});console.log('[OK] Sessions reloaded after refresh')}catch{warn('Sessions not reloaded')}
     await ss(page,'07-after-refresh.png');
 
-    /* ---- INTENTIONAL STOP: verify sane Offline state ---- */
-    await page.getByTestId('project-stop-server-button').click({force:false});
-    await page.waitForTimeout(4000);
-    /* After stop, TopBar should show "Offline" not "Error" */
-    const topStatus=await page.getByTestId('event-stream-status').textContent().catch(()=>'');
-    console.log(`[OK] Post-stop status: "${topStatus?.trim()}"`);
-    if(topStatus?.toLowerCase().includes('error'))fail('Event stream shows Error after intentional stop');
-    await ss(page,'08-post-stop-offline.png');
-
-    /* Regressions */
+    /* Regressions (captured while server is still running) */
     await page.getByTestId('right-review-tab').click();await page.waitForTimeout(1000);
     try{const t=await page.getByTestId('review-panel').textContent({timeout:3000});if(t?.includes('Failed to fetch'))fail('Review error')}catch{}
     await ss(page,'09-review-regression.png');
@@ -128,10 +119,20 @@ async function run(){
     await page.getByTestId('user-terminal-start-button').click();
     await page.waitForTimeout(2000);
     await av(page,'user-terminal-viewport','Term viewport');
+    await ss(page,'12-terminal.png');
     await page.getByTestId('user-terminal-close-button').click();
     await page.waitForTimeout(1000);
-    await ss(page,'12-terminal.png');
 
+    /* ---- INTENTIONAL STOP: verify sane Offline state ---- */
+    await page.getByTestId('project-stop-server-button').click({force:false});
+    await page.waitForTimeout(4000);
+    /* After stop, TopBar should show "Offline" not "Error" */
+    const topStatus=await page.getByTestId('event-stream-status').textContent().catch(()=>'');
+    console.log(`[OK] Post-stop status: "${topStatus?.trim()}"`);
+    if(topStatus?.toLowerCase().includes('error'))fail('Event stream shows Error after intentional stop');
+    await ss(page,'08-post-stop-offline.png');
+
+    /* Problems */
     await page.getByTestId('bottom-problems-tab').click();await page.waitForTimeout(500);
     await av(page,'problems-panel','Problems');
     await ss(page,'13-problems-clean.png');
