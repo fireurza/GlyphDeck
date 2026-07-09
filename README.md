@@ -2,7 +2,7 @@
 
 GlyphDeck is a local-first web workspace for managing projects, detecting OpenCode, running per-project OpenCode servers, streaming transcripts, reviewing changes, tracking usage, handling permissions, and using an interactive terminal — all from a browser UI.
 
-## POC Capabilities (M0–M10)
+## POC Capabilities (M0-M10)
 
 | Milestone | Feature | Status |
 |---|---|---|
@@ -18,6 +18,12 @@ GlyphDeck is a local-first web workspace for managing projects, detecting OpenCo
 | M8 | Permissions (approval popup with once/always/reject) | Accepted |
 | M9 | User Terminal (interactive shell in project cwd) | Accepted |
 | M10 | POC hardening (browser refresh, problems tab, graceful shutdown, docs) | Accepted |
+
+## Next Phase: MVP v0.1.0
+
+See [docs/agent/MVP_V0_1_0_PLAN.md](docs/agent/MVP_V0_1_0_PLAN.md) for the full MVP plan.
+
+Next implementation milestone: **M11 — SQLite persistence**.
 
 ## Prerequisites
 
