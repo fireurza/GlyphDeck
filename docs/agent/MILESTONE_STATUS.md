@@ -44,6 +44,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 4 — EventBridge streaming | Accepted | 6fe2911 | Real OpenCode /event SSE parser fix; live streaming proven end-to-end (backend probe + browser smoke, exact streamed text); connected status real; fresh-session selection by id |
 | Milestone 5 — Agent Terminal | Accepted | 732e22b | Fixed Stop Server/session-list flex-collapse overlap (root-caused via DOM measurement); read-only Agent Terminal fed live from existing M4 event stream, bounded 300-row client log, category filters, Clear; no new backend endpoint needed (documented in README) |
 | Milestone 6 — Usage tab | Accepted | 9f1c259 | Backend usage aggregation with `available`/`reason` fields; unavailable state in frontend; recovery smoke scripts hardened with durability, isolated workspaces, fresh-session-by-ID selection |
+| Milestone 7 — Review tab | Accepted | 8d3639b | Review tab with project/Git/session/activity summary; M7 smoke captured 14 fresh screenshots; Usage and Agent Terminal regressions verified |
 
 ---
 
@@ -58,10 +59,10 @@ Desktop Docker Sandbox mode: not used
 The next milestone is:
 
 ```text
-Milestone 7 — Review tab
+Milestone 8 — TBD from roadmap
 ```
 
-Milestone 6 accepted (Usage tab with backend aggregation endpoint + frontend panel validated).
+Milestone 7 accepted (Review tab with backend aggregation endpoint + frontend panel validated).
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
@@ -73,10 +74,10 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (Milestone 6 accepted; bump to Milestone 7 when M7 work begins):
+Current expected label (Milestone 7 accepted; bump to Milestone 8 when M8 work begins):
 
 ```text
-Milestone 6
+Milestone 7
 ```
 
 Rules:
@@ -165,7 +166,6 @@ MVP: Go binary serving embedded React assets
 Do not implement these until their milestone:
 
 ```text
-Review tab data (actively being implemented in M7)
 Permissions popup
 Questions UI
 User PTY terminal
