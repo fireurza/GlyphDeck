@@ -6,6 +6,7 @@ $repoRoot = Resolve-Path (Join-Path $scriptDir "..\..")
 $valDir = Join-Path $repoRoot ".glyphdeck\validation\m6_recovery"
 $logDir = Join-Path $valDir "logs"
 $pidDir = Join-Path $valDir "pids"
+$workspaceDir = Join-Path $valDir "workspace"
 
 New-Item -ItemType Directory -Path $logDir -Force | Out-Null
 New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
@@ -17,11 +18,18 @@ $frontendPort = "5173"
 
 Write-Host "=== GlyphDeck M6 Recovery — Start Dev ==="
 
-# ---- Pre-cleanup: kill leftover processes on GlyphDeck ports ----
-# Remove stale project JSON that triggers OpenCode server on startup.
-Remove-Item -Path (Join-Path $repoRoot ".glyphdeck\projects.json") -Force -ErrorAction SilentlyContinue
-Write-Host "[cleanup] Removed stale projects.json"
+# ---- Pre-cleanup: create isolated workspace ----
+# Never delete the main .glyphdeck/projects.json — that destroys user data.
+# The isolated workspace under .glyphdeck/validation/m6_recovery/workspace/
+# keeps old sessions from the main GlyphDeck repo out of this smoke run.
+New-Item -ItemType Directory -Path $workspaceDir -Force | Out-Null
+$workspaceReadme = Join-Path $workspaceDir "VALIDATION_README.txt"
+@"
+M6 recovery validation workspace $(Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz')
+"@ | Out-File -FilePath $workspaceReadme -Encoding ASCII -NoNewline
+Write-Host "[workspace] Isolated workspace ready at $workspaceDir"
 
+# ---- Pre-cleanup: kill leftover processes on GlyphDeck ports ----
 # Try the dev reset endpoint first to stop any app-owned OpenCode servers.
 try {
     $null = Invoke-WebRequest -Uri "http://127.0.0.1:${backendPort}/api/dev/reset-validation-state" -Method POST -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
