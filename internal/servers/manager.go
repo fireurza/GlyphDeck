@@ -16,10 +16,11 @@ import (
 
 // ServerManager launches and tracks OpenCode server processes.
 type ServerManager struct {
-	mu        sync.RWMutex
-	detector  opencode.Detector
-	resolver  ProjectResolver
-	processes map[string]*managedProcess // keyed by projectID
+	mu          sync.RWMutex
+	detector    opencode.Detector
+	resolver    ProjectResolver
+	processes   map[string]*managedProcess // keyed by projectID
+	eventBridge EventBridgeManager
 }
 
 // NewManager creates a ServerManager with the given detector and resolver.
@@ -29,6 +30,14 @@ func NewManager(detector opencode.Detector, resolver ProjectResolver) *ServerMan
 		resolver:  resolver,
 		processes: make(map[string]*managedProcess),
 	}
+}
+
+// SetEventBridgeManager configures an optional event bridge manager.
+// When set, the ServerManager will start/stop event bridges as servers come and go.
+func (m *ServerManager) SetEventBridgeManager(bridge EventBridgeManager) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.eventBridge = bridge
 }
 
 // GetBaseURL returns the HTTP base URL for a project's running OpenCode server.
@@ -168,7 +177,17 @@ func (m *ServerManager) Start(ctx context.Context, projectID string) (ServerStat
 
 	if healthOK {
 		mp.state = StateReady
-		return m.statusFromProcess(mp), nil
+		status := m.statusFromProcess(mp)
+
+		// Start event bridge when server becomes ready.
+		if m.eventBridge != nil {
+			url := fmt.Sprintf("http://127.0.0.1:%d", mp.port)
+			go func() {
+				_ = m.eventBridge.StartEventBridge(projectID, url)
+			}()
+		}
+
+		return status, nil
 	}
 
 	// 10. Timeout — kill process, set failed.
@@ -226,6 +245,12 @@ func (m *ServerManager) Stop(ctx context.Context, projectID string) (ServerStatu
 	defer m.mu.Unlock()
 
 	mp.state = StateStopped
+
+	// Stop event bridge when server stops.
+	if m.eventBridge != nil {
+		m.eventBridge.StopEventBridge(projectID)
+	}
+
 	delete(m.processes, projectID)
 	return ServerStatus{
 		ProjectID: projectID,

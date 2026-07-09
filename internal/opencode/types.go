@@ -9,6 +9,20 @@ type SessionClient interface {
 	GetSession(ctx context.Context, sessionID string) (Session, error)
 	ListMessages(ctx context.Context, sessionID string) ([]Message, error)
 	SendPrompt(ctx context.Context, sessionID, text string) (PromptResult, error)
+	StreamEvents(ctx context.Context) (<-chan NormalizedEvent, <-chan error)
+}
+
+// NormalizedEvent is the GlyphDeck-internal event representation.
+type NormalizedEvent struct {
+	Type      string
+	SessionID string
+	MessageID string
+	Data      any // raw decoded JSON payload
+}
+
+// EventStream defines the interface for streaming OpenCode events.
+type EventStream interface {
+	StreamEvents(ctx context.Context) (<-chan NormalizedEvent, <-chan error)
 }
 
 // Session represents an OpenCode session.

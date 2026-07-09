@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"glyphdeck/internal/devtools"
+	"glyphdeck/internal/events"
 	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/servers"
@@ -44,6 +45,11 @@ func main() {
 	sessionProjectAdapter := &sessionProjectResolverAdapter{registry: registry}
 	sessionsMgr := sessions.NewManager(manager, sessionProjectAdapter)
 	sessions.RegisterHandlers(mux, sessionsMgr)
+
+	// Events hub — bridges OpenCode SSE to browser clients.
+	eventsHub := events.NewHub()
+	manager.SetEventBridgeManager(eventsHub)
+	mux.HandleFunc("GET /api/events", eventsHub.ServeHTTP)
 
 	// Dev tools — only registered when GLYPHDECK_DEV_TOOLS=1.
 	devtools.RegisterHandlers(mux, registry, manager)

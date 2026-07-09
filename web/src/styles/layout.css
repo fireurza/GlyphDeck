@@ -38,6 +38,22 @@
   display: inline-block;
 }
 
+.status-indicator--connected {
+  background: #22c55e;
+}
+
+.status-indicator--reconnecting {
+  background: #eab308;
+}
+
+.status-indicator--error {
+  background: #ef4444;
+}
+
+.status-indicator--disconnected {
+  background: #6b7280;
+}
+
 /* Main area */
 .glyphdeck-main {
   display: flex;
@@ -592,6 +608,24 @@
   color: var(--color-text);
   border-bottom: 1px solid var(--color-border);
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.transcript-live-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: #1a2a1a;
+  border: 1px solid #22c55e;
+  color: #22c55e;
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
 .center-panel__transcript {
