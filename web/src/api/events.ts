@@ -74,11 +74,10 @@ export function useEventStream(projectId: string | null): {
 
     es.onerror = () => {
       if (cancelled) return;
-      if (es.readyState === EventSource.CLOSED) {
-        setStatus("disconnected");
-      } else {
-        setStatus("error");
-      }
+      // After intentional server stop or connection loss, show Offline
+      // rather than Error.  This keeps the top bar sane — the user
+      // stopped the server, not a crash.
+      setStatus("disconnected");
     };
 
     return () => {
