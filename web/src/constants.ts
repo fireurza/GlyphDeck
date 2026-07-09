@@ -1,1 +1,1 @@
-export const GLYPHDECK_VERSION = 'Milestone 7'
+export const GLYPHDECK_VERSION = 'Milestone 8'

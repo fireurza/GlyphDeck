@@ -7,6 +7,9 @@ import type {
   StreamEvent,
 } from '../api/events'
 import type { GlyphMessage, GlyphPart } from '../types/session'
+import { fetchPermissions } from '../api/permissions'
+import type { PermissionRequest } from '../types/permissions'
+import PermissionPopup from './PermissionPopup'
 
 interface CenterPanelProps {
   selectedProjectId?: string | null
@@ -27,6 +30,40 @@ function CenterPanel({
   const [isLoadingMessages, setIsLoadingMessages] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const transcriptEndRef = useRef<HTMLDivElement | null>(null)
+
+  /* ---- permission state ---- */
+  const [pendingPermission, setPendingPermission] =
+    useState<PermissionRequest | null>(null)
+  const permissionPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  const pollPermissions = useCallback(() => {
+    if (!selectedProjectId) return
+    fetchPermissions(selectedProjectId)
+      .then((requests) => {
+        setPendingPermission(
+          requests.length > 0 ? requests[0] : null,
+        )
+      })
+      .catch(() => setPendingPermission(null))
+  }, [selectedProjectId])
+
+  /* poll permissions every 2s when a session is active */
+  useEffect(() => {
+    if (permissionPollRef.current) {
+      clearInterval(permissionPollRef.current)
+      permissionPollRef.current = null
+    }
+    setPendingPermission(null)
+    if (selectedProjectId && selectedSessionId) {
+      pollPermissions()
+      permissionPollRef.current = setInterval(pollPermissions, 2000)
+    }
+    return () => {
+      if (permissionPollRef.current) {
+        clearInterval(permissionPollRef.current)
+      }
+    }
+  }, [selectedProjectId, selectedSessionId, pollPermissions])
 
   /* ---- event-stream state ---- */
   const streamedMessageIds = useRef<Set<string>>(new Set())
@@ -338,6 +375,14 @@ function CenterPanel({
 
         <div ref={transcriptEndRef} />
       </div>
+
+      {pendingPermission && selectedProjectId && (
+        <PermissionPopup
+          request={pendingPermission}
+          projectId={selectedProjectId}
+          onDismiss={() => setPendingPermission(null)}
+        />
+      )}
 
       <form className="prompt-composer" onSubmit={handleSendPrompt}>
         <textarea
