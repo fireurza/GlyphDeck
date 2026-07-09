@@ -1,14 +1,28 @@
 import { useState } from 'react'
+import AgentTerminal from './AgentTerminal'
+import type { EventStreamStatus, StreamEvent } from '../api/events'
 
 const TABS = ['Problems', 'Agent Terminal', 'Terminal'] as const
 
 const TAB_TEST_IDS: Record<string, string> = {
   Problems: 'problems-tab',
-  'Agent Terminal': 'agent-terminal-tab',
+  'Agent Terminal': 'bottom-agent-terminal-tab',
   Terminal: 'terminal-tab',
 }
 
-function BottomPanel() {
+interface BottomPanelProps {
+  selectedProjectId: string | null
+  selectedSessionId: string | null
+  eventStreamStatus: EventStreamStatus
+  latestEvent: StreamEvent | null
+}
+
+function BottomPanel({
+  selectedProjectId,
+  selectedSessionId,
+  eventStreamStatus,
+  latestEvent,
+}: BottomPanelProps) {
   const [activeTab, setActiveTab] = useState<string>('Problems')
 
   return (
@@ -25,9 +39,19 @@ function BottomPanel() {
           </button>
         ))}
       </div>
-      <div className="panel-body panel-placeholder">
-        <p>{activeTab} — no issues detected.</p>
-      </div>
+
+      {activeTab === 'Agent Terminal' ? (
+        <AgentTerminal
+          selectedProjectId={selectedProjectId}
+          selectedSessionId={selectedSessionId}
+          eventStreamStatus={eventStreamStatus}
+          latestEvent={latestEvent}
+        />
+      ) : (
+        <div className="panel-body panel-placeholder">
+          <p>{activeTab} — no issues detected.</p>
+        </div>
+      )}
     </footer>
   )
 }

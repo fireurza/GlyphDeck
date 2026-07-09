@@ -43,7 +43,12 @@ function App() {
         />
         <RightPanel />
       </div>
-      <BottomPanel />
+      <BottomPanel
+        selectedProjectId={selectedProjectId}
+        selectedSessionId={selectedSessionId}
+        eventStreamStatus={eventStreamStatus}
+        latestEvent={latestEvent}
+      />
     </div>
   )
 }

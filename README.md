@@ -26,6 +26,25 @@ Milestone 3 adds OpenCode session management and a non-streaming prompt loop. Re
 
 Streaming (SSE/EventBridge) starts in Milestone 4. This milestone uses request/response only.
 
+## Milestone 4 — EventBridge Streaming
+
+Milestone 4 adds live streaming from OpenCode to the browser. The backend connects to OpenCode's `/event` SSE stream as a long-lived connection, normalizes events, and fans them out to browser clients over `GET /api/events` (also SSE). The frontend connects as soon as a project is selected (independent of session selection) and shows connection status (`Live` / `Reconnecting` / `Offline` / `Error`) in the top bar. The session transcript updates directly from streamed `message.part.updated` / `message.part.delta` events — the non-streaming fetch from Milestone 3 remains only as a reconciliation fallback, not as the primary path.
+
+## Milestone 5 — Agent Terminal
+
+Milestone 5 adds a read-only Agent Terminal view in the bottom panel, populated live from the same Milestone 4 event stream, plus a fix for a layout defect carried forward from Milestone 4.
+
+**Stop Server / session list layout fix:** with many sessions in a project, a flex-layout bug could collapse the project card's controls (including Stop Server) to a 0px box while their content still rendered visually — placing the session list on top of the Stop Server button and making it unclickable without `{ force: true }`. Fixed by preventing the project list from being flex-shrunk and giving the session list its own bounded, independently-scrolling region.
+
+**Agent Terminal behavior:**
+
+- Read-only. There is no interactive input, no shell execution, and no command entry — it only displays activity already happening in the active OpenCode session.
+- Populated entirely from the existing browser event stream (`GET /api/events`); no new backend endpoint was added. All the event types the Agent Terminal needs (`session.updated`, `message.updated`, `message.part.updated`, `message.part.delta`, `session.next.step.*`, `session.next.tool.*`, `session.next.shell.*`, `permission.*`, plus the `glyphdeck.eventstream.*` connection signals) already flow through that stream with a `sessionID` GlyphDeck can filter on. Adding a second backend log/endpoint would have duplicated state the browser already has live — so it was skipped.
+- The event log is bounded in the browser (last 300 rows) and resets when the selected project/session changes, so it never shows another session's activity and never grows unbounded.
+- High-volume text-streaming events (`message.part.delta`, `message.part.updated`) collapse into a single updating row per message instead of adding a row per token/chunk.
+- Basic category filters (All / Tool / Shell / Message / Permission / System) and a Clear button are available.
+- **User PTY terminal is not implemented yet.** The bottom panel's "Terminal" tab remains a placeholder; interactive shell access is out of scope until a later milestone.
+
 ## Prerequisites
 
 - [Go](https://go.dev/dl/) (1.23+)
@@ -114,8 +133,16 @@ Working directory: project root
 10. Click the new session to open it in the center panel.
 11. Type a prompt (e.g., "List the validation commands from README.") and click Send.
 12. Confirm the assistant response appears in the transcript.
-13. Click Stop Server.
-14. Confirm server stops.
+13. Open the **Agent Terminal** tab in the bottom panel and confirm live event rows appear for the active session (session/message updates, streamed text, tool/shell events if the prompt triggered any).
+14. Click Clear in the Agent Terminal and confirm the visible rows are removed.
+15. Click Stop Server (no force-click needed).
+16. Confirm server stops.
+
+## Known Limitations
+
+- User-controlled terminal (PTY + xterm.js) is not implemented. The bottom panel's Terminal tab is a placeholder.
+- Agent Terminal shows only live activity from the moment it starts listening; it does not backfill history from before a session was selected.
+- Permissions approval popup, Usage tab aggregation, and Review tab data are not implemented yet (later milestones).
 
 ## Validation Commands
 
