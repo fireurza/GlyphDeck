@@ -1,0 +1,70 @@
+# GlyphDeck validation harness - start dev servers (M7)
+$ErrorActionPreference = "Stop"
+
+$scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$repoRoot = Resolve-Path (Join-Path $scriptDir "..\..")
+$valDir = Join-Path $repoRoot ".glyphdeck\validation\m7"
+$logDir = Join-Path $valDir "logs"
+$pidDir = Join-Path $valDir "pids"
+
+New-Item -ItemType Directory -Path $logDir -Force | Out-Null
+New-Item -ItemType Directory -Path $pidDir -Force | Out-Null
+
+$backendLog = Join-Path $logDir "backend.log"
+$frontendLog = Join-Path $logDir "frontend.log"
+$backendPort = if ($env:GLYPHDECK_PORT) { $env:GLYPHDECK_PORT } else { "8756" }
+$frontendPort = "5173"
+
+Write-Host "=== GlyphDeck M7 — Start Dev ==="
+
+# Pre-cleanup: kill leftover processes on ports
+try {
+    $null = Invoke-WebRequest -Uri "http://127.0.0.1:${backendPort}/api/dev/reset-validation-state" -Method POST -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
+    Write-Host "[cleanup] Dev reset OK"
+    Start-Sleep -Milliseconds 500
+} catch { Write-Host "[cleanup] No existing backend" }
+
+foreach ($port in @($backendPort, $frontendPort)) {
+    $existing = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($existing) {
+        try { Stop-Process -Id $existing.OwningProcess -Force -ErrorAction Stop; Write-Host "[cleanup] Killed PID $($existing.OwningProcess) on port $port"; Start-Sleep -Milliseconds 500 }
+        catch { Write-Host "[cleanup] Could not stop PID $($existing.OwningProcess) on port $port" }
+    }
+}
+
+# Backend
+Write-Host "[backend] Starting..."
+$backendJob = Start-Job -Name "glyphdeck-m7-backend" -ScriptBlock {
+    param($Root, $Log, $Port)
+    $env:GLYPHDECK_PORT = $Port
+    Set-Location -LiteralPath $Root
+    & go run ./cmd/glyphdeck >> $Log 2>&1
+} -ArgumentList $repoRoot, $backendLog, $backendPort
+
+$backendPID = $null
+for ($i = 1; $i -le 20; $i++) {
+    try {
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:${backendPort}/healthz" -Method GET -TimeoutSec 2 -UseBasicParsing -ErrorAction Stop
+        if ($resp.StatusCode -eq 200) { $conn = Get-NetTCPConnection -LocalPort $backendPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1; if ($conn) { $backendPID = $conn.OwningProcess }; break }
+    } catch {}
+    Start-Sleep -Milliseconds 500
+}
+if ($backendPID) { $backendPID | Out-File -FilePath (Join-Path $pidDir "backend.pid") -NoNewline -Encoding ASCII; Write-Host "[backend] PID $backendPID" }
+
+# Frontend
+Write-Host "[frontend] Starting..."
+$frontendJob = Start-Job -Name "glyphdeck-m7-frontend" -ScriptBlock {
+    param($WebDir, $Log)
+    Set-Location -LiteralPath $WebDir
+    & npm run dev >> $Log 2>&1
+} -ArgumentList (Join-Path $repoRoot "web"), $frontendLog
+
+$frontendPID = $null
+for ($i = 1; $i -le 20; $i++) {
+    $conn = Get-NetTCPConnection -LocalPort $frontendPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($conn) { $frontendPID = $conn.OwningProcess; Write-Host "[frontend] Port listening (attempt $i)"; break }
+    Start-Sleep -Milliseconds 500
+}
+if ($frontendPID) { $frontendPID | Out-File -FilePath (Join-Path $pidDir "frontend.pid") -NoNewline -Encoding ASCII; Write-Host "[frontend] PID $frontendPID" }
+
+Write-Host "=== Servers started ==="
