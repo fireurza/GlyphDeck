@@ -9,6 +9,8 @@ import (
 
 // UsageResponse is the JSON shape returned by the usage endpoint.
 type UsageResponse struct {
+	Available    bool                `json:"available"`
+	Reason       string              `json:"reason,omitempty"`
 	ProviderID   string              `json:"providerID"`
 	ModelID      string              `json:"modelID"`
 	Agent        string              `json:"agent"`
@@ -17,6 +19,17 @@ type UsageResponse struct {
 	Tokens       opencode.TokenUsage `json:"tokens"`
 	MessageCount int                 `json:"messageCount"`
 	UpdatedAt    string              `json:"updatedAt,omitempty"`
+}
+
+// aggregateResult is an internal type for building the response.
+type aggregateResult struct {
+	providerID string
+	modelID    string
+	agent      string
+	mode       string
+	cost       float64
+	tokens     opencode.TokenUsage
+	hasData    bool
 }
 
 // Resolver resolves a client and project path for a project ID.
@@ -36,9 +49,7 @@ func Aggregate(ctx context.Context, resolver Resolver, projectID, sessionID stri
 		return nil, err
 	}
 
-	resp := &UsageResponse{
-		MessageCount: len(messages),
-	}
+	ar := aggregateResult{}
 
 	// Walk messages in reverse to find the last assistant message with usage data.
 	for i := len(messages) - 1; i >= 0; i-- {
@@ -46,26 +57,51 @@ func Aggregate(ctx context.Context, resolver Resolver, projectID, sessionID stri
 		if msg.Info.Role != "assistant" {
 			continue
 		}
-		resp.ProviderID = msg.Info.ProviderID
-		resp.ModelID = msg.Info.ModelID
-		resp.Agent = msg.Info.Agent
-		resp.Mode = msg.Info.Mode
-		resp.Cost = msg.Info.Cost
-		resp.Tokens = msg.Info.Tokens
+		ar.providerID = msg.Info.ProviderID
+		ar.modelID = msg.Info.ModelID
+		ar.agent = msg.Info.Agent
+		ar.mode = msg.Info.Mode
+		ar.cost = msg.Info.Cost
+		ar.tokens = msg.Info.Tokens
 
 		// Return as soon as we have a non-empty token total.
-		if resp.Tokens.Total > 0 {
-			return resp, nil
+		if ar.tokens.Total > 0 {
+			return &UsageResponse{
+				Available:    true,
+				ProviderID:   ar.providerID,
+				ModelID:      ar.modelID,
+				Agent:        ar.agent,
+				Mode:         ar.mode,
+				Cost:         ar.cost,
+				Tokens:       ar.tokens,
+				MessageCount: len(messages),
+			}, nil
 		}
 
 		// If this assistant message has provider/model but no tokens,
 		// keep it but continue searching for token data.
-		if resp.ProviderID != "" || resp.ModelID != "" {
+		if ar.providerID != "" || ar.modelID != "" {
 			continue
 		}
 	}
 
+	// No assistant message with token data found.
 	// Return what we found even without token data.
-	// The caller can distinguish zero tokens from missing data.
+	resp := &UsageResponse{
+		MessageCount: len(messages),
+	}
+	if ar.providerID != "" || ar.modelID != "" {
+		resp.Available = false
+		resp.Reason = "OpenCode returned assistant metadata but no token usage data for this session yet."
+		resp.ProviderID = ar.providerID
+		resp.ModelID = ar.modelID
+		resp.Agent = ar.agent
+		resp.Mode = ar.mode
+		resp.Cost = ar.cost
+		resp.Tokens = ar.tokens
+	} else {
+		resp.Available = false
+		resp.Reason = "OpenCode did not provide usage fields for this session yet."
+	}
 	return resp, nil
 }

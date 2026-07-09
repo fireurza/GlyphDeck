@@ -79,6 +79,12 @@ func TestAggregate_EmptyMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if resp.Available {
+		t.Fatal("Available = true, want false for empty messages")
+	}
+	if resp.Reason == "" {
+		t.Fatal("Reason is empty, want non-empty reason")
+	}
 	if resp.MessageCount != 0 {
 		t.Fatalf("MessageCount = %d, want 0", resp.MessageCount)
 	}
@@ -96,8 +102,11 @@ func TestAggregate_NoAssistantMessages(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if resp.ProviderID != "" {
-		t.Fatalf("ProviderID = %q, want empty", resp.ProviderID)
+	if resp.Available {
+		t.Fatal("Available = true, want false when no assistant messages")
+	}
+	if resp.Reason == "" {
+		t.Fatal("Reason is empty, want non-empty reason")
 	}
 	if resp.MessageCount != 1 {
 		t.Fatalf("MessageCount = %d, want 1", resp.MessageCount)
@@ -133,6 +142,9 @@ func TestAggregate_LastAssistantWithTokens(t *testing.T) {
 	resp, err := Aggregate(context.Background(), r, "proj-1", "sess-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.Available {
+		t.Fatal("Available = false, want true when tokens present")
 	}
 	if resp.ProviderID != "deepseek" {
 		t.Fatalf("ProviderID = %q, want deepseek", resp.ProviderID)
@@ -208,11 +220,52 @@ func TestAggregate_SkipsAssistantWithoutTokens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if !resp.Available {
+		t.Fatal("Available = false, want true when tokens found in later message")
+	}
 	// Should pick m4 (last assistant with tokens).
 	if resp.Tokens.Total != 100 {
 		t.Fatalf("Tokens.Total = %d, want 100", resp.Tokens.Total)
 	}
 	if resp.MessageCount != 4 {
 		t.Fatalf("MessageCount = %d, want 4", resp.MessageCount)
+	}
+}
+
+func TestAggregate_AssistantWithoutTokens_Unavailable(t *testing.T) {
+	r := mockResolver{
+		client: &mockSessionClient{
+			messages: []opencode.Message{
+				{Info: opencode.MessageInfo{ID: "m1", Role: "user"}},
+				{
+					Info: opencode.MessageInfo{
+						ID:         "m2",
+						Role:       "assistant",
+						ProviderID: "deepseek",
+						ModelID:    "deepseek-v4-pro",
+						// No tokens.
+					},
+				},
+			},
+		},
+	}
+	resp, err := Aggregate(context.Background(), r, "proj-1", "sess-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.Available {
+		t.Fatal("Available = true, want false when no token data")
+	}
+	if resp.Reason == "" {
+		t.Fatal("Reason is empty, want non-empty reason")
+	}
+	if resp.ProviderID != "deepseek" {
+		t.Fatalf("ProviderID = %q, want deepseek (metadata present)", resp.ProviderID)
+	}
+	if resp.ModelID != "deepseek-v4-pro" {
+		t.Fatalf("ModelID = %q, want deepseek-v4-pro", resp.ModelID)
+	}
+	if resp.MessageCount != 2 {
+		t.Fatalf("MessageCount = %d, want 2", resp.MessageCount)
 	}
 }

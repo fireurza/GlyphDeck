@@ -1,4 +1,6 @@
 export type UsageResponse = {
+  available: boolean
+  reason?: string
   providerID: string
   modelID: string
   agent: string
