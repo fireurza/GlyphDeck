@@ -13,6 +13,7 @@ import (
 	"glyphdeck/internal/problems"
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/review"
+	"glyphdeck/internal/sandboxes"
 	"glyphdeck/internal/servers"
 	"glyphdeck/internal/sessions"
 	"glyphdeck/internal/settings"
@@ -69,6 +70,13 @@ func main() {
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	projects.RegisterHandlers(mux, registry)
 	servers.RegisterHandlers(mux, manager)
+
+	// Server/sandbox configuration registry.
+	sandboxReg, err := sandboxes.NewRegistry(db.Conn())
+	if err != nil {
+		log.Fatalf("sandbox registry error: %v", err)
+	}
+	sandboxes.RegisterHandlers(mux, sandboxReg)
 
 	// Sessions.
 	sessionsProjectAdapter := &projectPathsResolverAdapter{registry: registry, notFoundErr: sessions.ErrProjectNotFound}

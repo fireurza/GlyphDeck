@@ -14,6 +14,12 @@ vi.mock('./layout/LeftPanel', () => ({
   default: () => <aside data-testid="left-panel-body" />,
 }))
 
+vi.mock('./layout/ServersPanel', () => ({
+  default: () => (
+    <aside data-testid="left-panel-body" />
+  ),
+}))
+
 vi.mock('./layout/CenterPanel', () => ({
   default: () => <main data-testid="center-panel" />,
 }))

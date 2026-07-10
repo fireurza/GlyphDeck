@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import TopBar from './layout/TopBar'
-import ActivityRail from './layout/ActivityRail'
+import ActivityRail, { type RailView } from './layout/ActivityRail'
 import LeftPanel from './layout/LeftPanel'
+import ServersPanel from './layout/ServersPanel'
 import CenterPanel from './layout/CenterPanel'
 import RightPanel from './layout/RightPanel'
 import BottomPanel from './layout/BottomPanel'
@@ -78,6 +79,7 @@ function App() {
     () => readLS(LS_SESSION_KEY),
   )
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [activeRailView, setActiveRailView] = useState<RailView>('projects')
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const { status: eventStreamStatus, latestEvent } = useEventStream(selectedProjectId)
 
@@ -105,16 +107,22 @@ function App() {
       <TopBar eventStreamStatus={eventStreamStatus} />
       <div className="glyphdeck-main">
         <ActivityRail
+          activeView={activeRailView}
+          onSelectView={setActiveRailView}
           onOpenSettings={() => setSettingsOpen(true)}
           settingsOpen={settingsOpen}
           settingsButtonRef={settingsTriggerRef}
         />
-        <LeftPanel
-          initialProjectId={selectedProjectId}
-          initialSessionId={selectedSessionId}
-          onSelectProject={handleSelectProject}
-          onSelectSession={handleSelectSession}
-        />
+        {activeRailView === 'projects' ? (
+          <LeftPanel
+            initialProjectId={selectedProjectId}
+            initialSessionId={selectedSessionId}
+            onSelectProject={handleSelectProject}
+            onSelectSession={handleSelectSession}
+          />
+        ) : (
+          <ServersPanel />
+        )}
         <CenterPanel
           selectedProjectId={selectedProjectId}
           selectedSessionId={selectedSessionId}
