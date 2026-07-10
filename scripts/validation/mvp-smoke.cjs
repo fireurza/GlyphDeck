@@ -357,7 +357,7 @@ async function run() {
   await screenshot('12-terminal-marker-visible.png', 'Terminal marker output visible');
 
   const childMarker = `GLYPHDECK_MVP_CHILD_${RUN_ID.toUpperCase()}`;
-  const childCommand = `Start-Process -FilePath node.exe -ArgumentList @('-e', 'setInterval(function(){},1000)', '--', '--${childMarker}')`;
+  const childCommand = `node.exe -e "setInterval(function(){},1000)" -- --${childMarker}`;
   await page.getByTestId('user-terminal-input').fill(childCommand);
   await page.getByTestId('user-terminal-input').press('Enter');
   let childPID;
