@@ -71,12 +71,12 @@ func main() {
 	servers.RegisterHandlers(mux, manager)
 
 	// Sessions.
-	sessionProjectAdapter := &sessionProjectResolverAdapter{registry: registry}
-	sessionsMgr := sessions.NewManager(manager, sessionProjectAdapter)
+	sessionsProjectAdapter := &projectPathsResolverAdapter{registry: registry, notFoundErr: sessions.ErrProjectNotFound}
+	sessionsMgr := sessions.NewManager(manager, sessionsProjectAdapter)
 	sessions.RegisterHandlers(mux, sessionsMgr)
 
 	// Usage.
-	usageProjectAdapter := &usageProjectResolverAdapter{registry: registry}
+	usageProjectAdapter := &projectPathsResolverAdapter{registry: registry, notFoundErr: usage.ErrProjectNotFound}
 	usageMgr := usage.NewManager(manager, usageProjectAdapter)
 	usage.RegisterHandlers(mux, usageMgr)
 
@@ -86,7 +86,7 @@ func main() {
 	review.RegisterHandlers(mux, reviewMgr)
 
 	// Permissions.
-	permissionsProjectAdapter := &permissionsProjectResolverAdapter{registry: registry}
+	permissionsProjectAdapter := &projectPathsResolverAdapter{registry: registry, notFoundErr: fmt.Errorf("project not found")}
 	permissionsMgr := permissions.NewManager(manager, permissionsProjectAdapter)
 	permissions.RegisterHandlers(mux, permissionsMgr)
 
@@ -210,36 +210,23 @@ func (a *projectResolverAdapter) Get(ctx context.Context, id string) (servers.Pr
 	return servers.ProjectInfo{ID: project.ID, Name: project.Name, Path: project.Path}, nil
 }
 
-// sessionProjectResolverAdapter adapts the projects.Registry to sessions.ProjectResolver.
-type sessionProjectResolverAdapter struct {
-	registry *projects.Registry
+// projectPathsResolverAdapter adapts projects.Registry to ProjectResolver for
+// sessions, usage, and permissions packages. notFoundErr provides the
+// package-specific sentinel so HTTP error mappers can use errors.Is.
+type projectPathsResolverAdapter struct {
+	registry    *projects.Registry
+	notFoundErr error
 }
 
-func (a *sessionProjectResolverAdapter) Get(ctx context.Context, id string) (sessions.ProjectInfo, error) {
+func (a *projectPathsResolverAdapter) Get(ctx context.Context, id string) (opencode.ProjectPaths, error) {
 	project, err := a.registry.Get(ctx, id)
 	if errors.Is(err, projects.ErrProjectNotFound) {
-		return sessions.ProjectInfo{}, sessions.ErrProjectNotFound
+		return opencode.ProjectPaths{}, a.notFoundErr
 	}
 	if err != nil {
-		return sessions.ProjectInfo{}, err
+		return opencode.ProjectPaths{}, err
 	}
-	return sessions.ProjectInfo{ID: project.ID, Path: project.Path}, nil
-}
-
-// usageProjectResolverAdapter adapts the projects.Registry to usage.ProjectResolver.
-type usageProjectResolverAdapter struct {
-	registry *projects.Registry
-}
-
-func (a *usageProjectResolverAdapter) Get(ctx context.Context, id string) (usage.ProjectInfo, error) {
-	project, err := a.registry.Get(ctx, id)
-	if errors.Is(err, projects.ErrProjectNotFound) {
-		return usage.ProjectInfo{}, usage.ErrProjectNotFound
-	}
-	if err != nil {
-		return usage.ProjectInfo{}, err
-	}
-	return usage.ProjectInfo{ID: project.ID, Path: project.Path}, nil
+	return opencode.ProjectPaths{ID: project.ID, Path: project.Path}, nil
 }
 
 // reviewProjectResolverAdapter adapts the projects.Registry to review.ProjectResolver.
@@ -253,22 +240,6 @@ func (a *reviewProjectResolverAdapter) Get(ctx context.Context, id string) (*pro
 		return nil, err
 	}
 	return &project, nil
-}
-
-// permissionsProjectResolverAdapter adapts the projects.Registry to permissions.ProjectResolver.
-type permissionsProjectResolverAdapter struct {
-	registry *projects.Registry
-}
-
-func (a *permissionsProjectResolverAdapter) Get(ctx context.Context, id string) (permissions.ProjectInfo, error) {
-	project, err := a.registry.Get(ctx, id)
-	if errors.Is(err, projects.ErrProjectNotFound) {
-		return permissions.ProjectInfo{}, fmt.Errorf("project not found")
-	}
-	if err != nil {
-		return permissions.ProjectInfo{}, err
-	}
-	return permissions.ProjectInfo{ID: project.ID, Path: project.Path}, nil
 }
 
 // terminalProjectResolverAdapter adapts the projects.Registry to terminal.ProjectResolver.

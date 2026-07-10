@@ -9,29 +9,18 @@ import (
 
 // Manager resolves OpenCode clients for usage aggregation.
 type Manager struct {
-	servers  ServerResolver
+	servers  opencode.ServerResolver
 	projects ProjectResolver
 	clientFn func(baseURL, username, password string) opencode.SessionClient
 }
 
-// ServerResolver resolves a ready server's base URL for a project.
-type ServerResolver interface {
-	GetBaseURL(ctx context.Context, projectID string) (string, error)
-}
-
 // ProjectResolver resolves project details for server management.
 type ProjectResolver interface {
-	Get(ctx context.Context, id string) (ProjectInfo, error)
-}
-
-// ProjectInfo carries the fields required to interact with an OpenCode project.
-type ProjectInfo struct {
-	ID   string
-	Path string
+	Get(ctx context.Context, id string) (opencode.ProjectPaths, error)
 }
 
 // NewManager creates a usage Manager with the given resolvers.
-func NewManager(servers ServerResolver, projects ProjectResolver) *Manager {
+func NewManager(servers opencode.ServerResolver, projects ProjectResolver) *Manager {
 	return &Manager{
 		servers:  servers,
 		projects: projects,
@@ -42,7 +31,7 @@ func NewManager(servers ServerResolver, projects ProjectResolver) *Manager {
 }
 
 // NewManagerWithClient creates a usage Manager with a custom client factory.
-func NewManagerWithClient(servers ServerResolver, projects ProjectResolver, clientFn func(baseURL, username, password string) opencode.SessionClient) *Manager {
+func NewManagerWithClient(servers opencode.ServerResolver, projects ProjectResolver, clientFn func(baseURL, username, password string) opencode.SessionClient) *Manager {
 	return &Manager{
 		servers:  servers,
 		projects: projects,

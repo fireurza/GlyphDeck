@@ -22,17 +22,17 @@ func (m mockServerResolver) GetBaseURL(_ context.Context, projectID string) (str
 }
 
 type mockProjectResolver struct {
-	projects map[string]ProjectInfo
+	projects map[string]opencode.ProjectPaths
 	err      error
 }
 
-func (m mockProjectResolver) Get(_ context.Context, id string) (ProjectInfo, error) {
+func (m mockProjectResolver) Get(_ context.Context, id string) (opencode.ProjectPaths, error) {
 	if m.err != nil {
-		return ProjectInfo{}, m.err
+		return opencode.ProjectPaths{}, m.err
 	}
 	p, ok := m.projects[id]
 	if !ok {
-		return ProjectInfo{}, ErrProjectNotFound
+		return opencode.ProjectPaths{}, ErrProjectNotFound
 	}
 	return p, nil
 }
@@ -82,7 +82,7 @@ func (m *mockSessionClient) StreamEvents(_ context.Context) (<-chan opencode.Nor
 // Tests
 // ---------------------------------------------------------------------------
 
-func newTestManager(servers ServerResolver, projects ProjectResolver) *Manager {
+func newTestManager(servers opencode.ServerResolver, projects ProjectResolver) *Manager {
 	return NewManagerWithClient(servers, projects, func(baseURL, username, password string) opencode.SessionClient {
 		return &mockSessionClient{}
 	})
@@ -90,7 +90,7 @@ func newTestManager(servers ServerResolver, projects ProjectResolver) *Manager {
 
 func TestManager_ProjectNotFound(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
-	projects := mockProjectResolver{projects: map[string]ProjectInfo{}}
+	projects := mockProjectResolver{projects: map[string]opencode.ProjectPaths{}}
 	mgr := newTestManager(servers, projects)
 
 	_, err := mgr.ListSessions(context.Background(), "nonexistent")
@@ -102,7 +102,7 @@ func TestManager_ProjectNotFound(t *testing.T) {
 func TestManager_ServerNotReady(t *testing.T) {
 	servers := mockServerResolver{err: ErrServerNotReady}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -120,7 +120,7 @@ func TestManager_ServerNotReady(t *testing.T) {
 func TestManager_ListSessions(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -149,7 +149,7 @@ func TestManager_ListSessions(t *testing.T) {
 func TestManager_CreateSession(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -174,7 +174,7 @@ func TestManager_CreateSession(t *testing.T) {
 func TestManager_GetSession(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -199,7 +199,7 @@ func TestManager_GetSession(t *testing.T) {
 func TestManager_ListMessages(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -225,7 +225,7 @@ func TestManager_ListMessages(t *testing.T) {
 func TestManager_SendPrompt(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -255,7 +255,7 @@ func TestManager_SendPrompt(t *testing.T) {
 func TestManager_OpencodeError(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}

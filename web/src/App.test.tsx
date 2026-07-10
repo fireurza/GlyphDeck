@@ -32,9 +32,27 @@ function jsonResponse(body: unknown) {
   })
 }
 
-test('opens and closes Settings as a modal dialog', async () => {
-  vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}))
+let fetchSpy: ReturnType<typeof vi.spyOn>
 
+beforeEach(() => {
+  fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(jsonResponse({}))
+})
+
+afterEach(() => {
+  fetchSpy.mockRestore()
+})
+
+test('renders shell layout', () => {
+  render(<App />)
+  expect(screen.getByTestId('app-shell')).toBeInTheDocument()
+  expect(screen.getByTestId('top-bar')).toBeInTheDocument()
+  expect(screen.getByTestId('left-panel-body')).toBeInTheDocument()
+  expect(screen.getByTestId('center-panel')).toBeInTheDocument()
+  expect(screen.getByTestId('right-panel')).toBeInTheDocument()
+  expect(screen.getByTestId('bottom-panel')).toBeInTheDocument()
+})
+
+test('opens and closes Settings as a modal dialog', async () => {
   render(<App />)
 
   const trigger = screen.getByTestId('activity-settings-button')

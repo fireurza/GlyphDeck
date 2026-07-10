@@ -9,28 +9,17 @@ import (
 
 // Manager resolves OpenCode clients for permission operations.
 type Manager struct {
-	servers  ServerResolver
+	servers  opencode.ServerResolver
 	projects ProjectResolver
-}
-
-// ServerResolver resolves a ready server's base URL for a project.
-type ServerResolver interface {
-	GetBaseURL(ctx context.Context, projectID string) (string, error)
 }
 
 // ProjectResolver resolves project details.
 type ProjectResolver interface {
-	Get(ctx context.Context, id string) (ProjectInfo, error)
-}
-
-// ProjectInfo carries the fields required to interact with a project.
-type ProjectInfo struct {
-	ID   string
-	Path string
+	Get(ctx context.Context, id string) (opencode.ProjectPaths, error)
 }
 
 // NewManager creates a permissions Manager.
-func NewManager(servers ServerResolver, projects ProjectResolver) *Manager {
+func NewManager(servers opencode.ServerResolver, projects ProjectResolver) *Manager {
 	return &Manager{servers: servers, projects: projects}
 }
 
