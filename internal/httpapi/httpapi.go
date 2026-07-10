@@ -50,7 +50,7 @@ func IsMutationMethod(method string) bool {
 func SameOriginMutation(r *http.Request) bool {
 	origin := r.Header.Get("Origin")
 	if origin == "" {
-		return true
+		return false
 	}
 	return AllowLocalMutation(r)
 }
@@ -63,7 +63,7 @@ func AllowLocalMutation(r *http.Request) bool {
 
 	origin := r.Header.Get("Origin")
 	if origin == "" {
-		return true
+		return false
 	}
 
 	parsed, err := url.Parse(origin)

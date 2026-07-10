@@ -64,6 +64,7 @@ func TestLocalMutationGuard(t *testing.T) {
 		want   int
 	}{
 		{name: "loopback same origin", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://127.0.0.1:8756", want: http.StatusNoContent},
+		{name: "missing origin rejected", method: http.MethodPost, host: "127.0.0.1:8756", want: http.StatusForbidden},
 		{name: "different loopback port rejected in release mode", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://127.0.0.1:5173", want: http.StatusForbidden},
 		{name: "different loopback hostname rejected in release mode", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://localhost:8756", want: http.StatusForbidden},
 		{name: "cross origin mutation", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://evil.example", want: http.StatusForbidden},

@@ -3,6 +3,7 @@ package sessions
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -14,6 +15,19 @@ import (
 // ---------------------------------------------------------------------------
 // HTTP tests
 // ---------------------------------------------------------------------------
+
+func postSameOrigin(t *testing.T, ts *httptest.Server, path, contentType string, body io.Reader) (*http.Response, error) {
+	t.Helper()
+	req, err := http.NewRequest(http.MethodPost, ts.URL+path, body)
+	if err != nil {
+		t.Fatalf("create POST request: %v", err)
+	}
+	req.Header.Set("Origin", ts.URL)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	return ts.Client().Do(req)
+}
 
 func TestListSessions_ProjectNotFound(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
@@ -126,7 +140,7 @@ func TestCreateSession_Success(t *testing.T) {
 	defer ts.Close()
 
 	body := strings.NewReader(`{"title":"My Title"}`)
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/sessions", "application/json", body)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/sessions", "application/json", body)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -168,7 +182,7 @@ func TestCreateSession_DefaultTitle(t *testing.T) {
 
 	// No title field in JSON.
 	body := strings.NewReader(`{}`)
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/sessions", "application/json", body)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/sessions", "application/json", body)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -211,7 +225,7 @@ func TestCreateSession_MissingJSONContentType(t *testing.T) {
 	defer ts.Close()
 
 	body := strings.NewReader(`{"title":"X"}`)
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/sessions", "", body)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/sessions", "", body)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -320,7 +334,7 @@ func TestSendPrompt_Success(t *testing.T) {
 	defer ts.Close()
 
 	body := strings.NewReader(`{"text":"Hello"}`)
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/sessions/sess-1/prompt", "application/json", body)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/sessions/sess-1/prompt", "application/json", body)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -354,7 +368,7 @@ func TestSendPrompt_MissingText(t *testing.T) {
 	defer ts.Close()
 
 	body := strings.NewReader(`{}`)
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/sessions/sess-1/prompt", "application/json", body)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/sessions/sess-1/prompt", "application/json", body)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
@@ -408,7 +422,7 @@ func TestSendPrompt_OpencodeError(t *testing.T) {
 	defer ts.Close()
 
 	body := strings.NewReader(`{"text":"Hello"}`)
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/sessions/sess-1/prompt", "application/json", body)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/sessions/sess-1/prompt", "application/json", body)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
 	}
