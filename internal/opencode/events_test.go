@@ -346,17 +346,16 @@ func TestStreamEvents_ContextCancellation(t *testing.T) {
 
 	select {
 	case <-connOpen:
-	case <-time.After(3 * time.Second):
+	case <-time.After(time.Second):
 		t.Fatal("SSE connection did not open")
 	}
 	cancel()
 
 	select {
 	case <-connClosed:
-	case <-time.After(3 * time.Second):
+	case <-time.After(time.Second):
 		t.Fatal("server did not detect client disconnect")
 	}
-	// Drain until channel closes.
 	for range events {
 	}
 }
@@ -388,7 +387,7 @@ func TestStreamEvents_Reconnect(t *testing.T) {
 	ts := fake.start(t)
 
 	client := NewClient(ts.URL, "", "")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
 	events, _ := client.StreamEvents(ctx)
@@ -417,7 +416,7 @@ func TestStreamEvents_HTTPError(t *testing.T) {
 	ts := fake.start(t)
 
 	client := NewClient(ts.URL, "", "")
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 
 	events, errs := client.StreamEvents(ctx)

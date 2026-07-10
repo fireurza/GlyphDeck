@@ -31,7 +31,7 @@ func postSameOrigin(t *testing.T, ts *httptest.Server, path, contentType string,
 
 func TestListSessions_ProjectNotFound(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
-	projects := mockProjectResolver{projects: map[string]ProjectInfo{}}
+	projects := mockProjectResolver{projects: map[string]opencode.ProjectPaths{}}
 	mgr := newTestManager(servers, projects)
 
 	mux := http.NewServeMux()
@@ -53,7 +53,7 @@ func TestListSessions_ProjectNotFound(t *testing.T) {
 func TestListSessions_ServerNotReady(t *testing.T) {
 	servers := mockServerResolver{err: ErrServerNotReady}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -78,7 +78,7 @@ func TestListSessions_ServerNotReady(t *testing.T) {
 func TestListSessions_Success(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -121,7 +121,7 @@ func TestListSessions_Success(t *testing.T) {
 func TestCreateSession_Success(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -162,7 +162,7 @@ func TestCreateSession_Success(t *testing.T) {
 func TestCreateSession_DefaultTitle(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -239,7 +239,7 @@ func TestCreateSession_MissingJSONContentType(t *testing.T) {
 func TestGetSession_Success(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -271,7 +271,7 @@ func TestGetSession_Success(t *testing.T) {
 func TestListMessages_Success(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -313,7 +313,7 @@ func TestListMessages_Success(t *testing.T) {
 func TestSendPrompt_Success(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -356,7 +356,7 @@ func TestSendPrompt_Success(t *testing.T) {
 func TestSendPrompt_MissingText(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
@@ -405,7 +405,7 @@ func TestSendPrompt_SameOriginRejection(t *testing.T) {
 func TestSendPrompt_OpencodeError(t *testing.T) {
 	servers := mockServerResolver{baseURL: "http://127.0.0.1:4096"}
 	projects := mockProjectResolver{
-		projects: map[string]ProjectInfo{
+		projects: map[string]opencode.ProjectPaths{
 			"proj-1": {ID: "proj-1", Path: "/test"},
 		},
 	}
