@@ -219,7 +219,8 @@ func isMutationMethod(method string) bool {
 }
 
 func isAllowedLocalMutation(r *http.Request) bool {
-	if !isLoopbackHost(requestHostname(r.Host)) {
+	requestHost := normalizedHostPort(r.Host)
+	if !isLoopbackHost(requestHostname(requestHost)) {
 		return false
 	}
 
@@ -231,7 +232,19 @@ func isAllowedLocalMutation(r *http.Request) bool {
 	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
 		return false
 	}
-	return isLoopbackHost(requestHostname(parsed.Host))
+	originHost := normalizedHostPort(parsed.Host)
+	if originHost == requestHost {
+		return true
+	}
+	return devToolsEnabled() && isLoopbackHost(requestHostname(originHost))
+}
+
+func devToolsEnabled() bool {
+	return os.Getenv("GLYPHDECK_DEV_TOOLS") == "1"
+}
+
+func normalizedHostPort(hostPort string) string {
+	return strings.ToLower(strings.TrimSpace(hostPort))
 }
 
 func requestHostname(hostPort string) string {
