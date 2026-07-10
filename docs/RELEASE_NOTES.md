@@ -55,4 +55,3 @@ embedded frontend loading outside the repository root.
   SQLite. Reload sessions after the server is available.
 - There is no installer. Build the binary and perform manual local setup.
 - Usage remains unavailable until OpenCode supplies usage fields.
-

@@ -52,7 +52,7 @@ Desktop Docker Sandbox mode: not used
 | Milestone 12 — State model cleanup | Accepted | a905eb6 | Sessions auto-load when project becomes ready (browser refresh, server start); event stream shows Offline not Error after intentional stop; session creation works after refresh; validation corrected (vision review + Notepad/npx.ps1 guard) |
 | Milestone 13 — Settings + embed + release | Accepted | 137cee6 | Settings page (SQLite-backed, save persists); release build scripts added. The former working-directory frontend serving is corrected by the v0.1.0 candidate work. |
 | Milestone 14 — Terminal reliability | Accepted | 6e46911 | Terminal SSE streaming rewritten (goroutine + channel + per-chunk flush + 100ms ticker); marker output reliably visible; all regressions clean; M14 vision review PASS |
-| v0.1.0 — MVP release candidate | Accepted | 6778e4a | Embedded release binary, activity-rail Settings modal, three-tab dock, isolated release smoke, code review, and manual vision review pass |
+| v0.1.0 — MVP release | Accepted | 6778e4a + v0.1.0 tag | Embedded release binary, activity-rail Settings modal, three-tab dock, isolated release smoke, code review, manual vision review, and release notes |
 
 ---
 
@@ -64,11 +64,12 @@ Desktop Docker Sandbox mode: not used
 
 ## Current Next Step
 
-The release candidate is accepted. The next release action, when separately authorized, is:
+The v0.1.0 release action is complete:
 
-```text
-Create the v0.1.0 tag and release notes.
-```
+- Release notes: [`docs/RELEASE_NOTES.md`](../RELEASE_NOTES.md)
+- Annotated tag: `v0.1.0`
+
+No post-v0.1.0 milestone work is authorized by this file.
 
 M14 accepted (terminal SSE streaming fix — marker output reliably visible).
 
@@ -99,7 +100,7 @@ smoke with a normal, non-force click).
 
 The top-right UI label must be updated every milestone.
 
-Current expected label (v0.1.0 release candidate):
+Current expected label (v0.1.0 release):
 
 ```text
 v0.1.0
