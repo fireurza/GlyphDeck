@@ -224,6 +224,8 @@ func TestProjectHTTPRejectsMissingJSONContentType(t *testing.T) {
 	RegisterHandlers(mux, registry)
 	body := strings.NewReader(`{"name":"Test","path":"` + t.TempDir() + `","trusted":false}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/projects", body)
+	req.Host = "127.0.0.1:8756"
+	req.Header.Set("Origin", "http://127.0.0.1:8756")
 	res := httptest.NewRecorder()
 
 	mux.ServeHTTP(res, req)
@@ -240,6 +242,7 @@ func TestProjectHTTPRejectsCrossOriginMutation(t *testing.T) {
 	RegisterHandlers(mux, registry)
 	body := strings.NewReader(`{"name":"Test","path":"` + t.TempDir() + `","trusted":false}`)
 	req := httptest.NewRequest(http.MethodPost, "/api/projects", body)
+	req.Host = "127.0.0.1:8756"
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Origin", "http://evil.example")
 	res := httptest.NewRecorder()
@@ -259,9 +262,9 @@ func TestSameOriginMutation(t *testing.T) {
 		want   bool
 	}{
 		{
-			name: "empty origin",
+			name: "empty origin rejected",
 			host: "127.0.0.1:8756",
-			want: true,
+			want: false,
 		},
 		{
 			name:   "same origin",

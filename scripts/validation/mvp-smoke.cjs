@@ -79,7 +79,7 @@ async function closeValidationTerminal() {
   try {
     const response = await fetch(
       `${BASE_URL}/api/terminals/${encodeURIComponent(validationTerminalID)}/close`,
-      { method: 'POST' },
+      { method: 'POST', headers: { Origin: BASE_URL } },
     );
     if (!response.ok && response.status !== 404) {
       console.error(`[cleanup] terminal close returned ${response.status}: ${await response.text()}`);
