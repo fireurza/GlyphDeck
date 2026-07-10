@@ -91,8 +91,15 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-- App-owned servers and terminals do not survive backend shutdown.
-- Sessions come from the running OpenCode server; GlyphDeck restores selection only.
-- Windows ConPTY implementation exists in `internal/terminal/session_windows.go` but is
-  disabled (pipe-based fallback used). The smoke-test child-process WMI-detection step
-  fails when ConPTY is active; this must be resolved before enabling the PTY path.
+1. No auth / first-run admin setup is missing. GlyphDeck has no user authentication;
+   the loopback-only boundary is not a substitute for authentication.
+
+2. OpenCode server/sandbox lifecycle is incomplete. The foundation (server configs,
+   attach/detach, status check, state clearing) is implemented. Remaining work:
+   - Remote SSH detect/start/stop (SSH config aliases stored, endpoints not yet built).
+   - Remote agent/skill/MCP sync (future feature, not planned for v0.1.0).
+
+3. Windows ConPTY is disabled. The implementation exists in
+   `internal/terminal/session_windows.go` but the pipe-based fallback is active
+   because the smoke-test child-process WMI-detection step fails when ConPTY
+   is enabled. This must be resolved before enabling the PTY path.

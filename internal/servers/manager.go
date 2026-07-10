@@ -18,11 +18,13 @@ import (
 
 // ServerManager launches and tracks OpenCode server processes.
 type ServerManager struct {
-	mu          sync.RWMutex
-	detector    opencode.Detector
-	resolver    ProjectResolver
-	processes   map[string]*managedProcess // keyed by projectID
-	eventBridge EventBridgeManager
+	mu             sync.RWMutex
+	detector       opencode.Detector
+	resolver       ProjectResolver
+	processes      map[string]*managedProcess // keyed by projectID
+	eventBridge    EventBridgeManager
+	activeServerID string
+	activeBaseURL  string
 }
 
 // NewManager creates a ServerManager with the given detector and resolver.
