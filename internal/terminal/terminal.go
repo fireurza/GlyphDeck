@@ -4,7 +4,9 @@ package terminal
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
+	"glyphdeck/internal/lifecycle"
 	"io"
 	"os"
 	"os/exec"
@@ -42,22 +44,24 @@ type ProjectResolver interface {
 
 // Manager creates and tracks terminal sessions.
 type Manager struct {
-	mu        sync.RWMutex
-	terminals map[string]*Terminal
-	nextID    int
-	shellPath string
-	shellArgs []string
-	resolver  ProjectResolver
+	mu         sync.RWMutex
+	terminals  map[string]*Terminal
+	nextID     int
+	shellPath  string
+	shellArgs  []string
+	resolver   ProjectResolver
+	terminator func(*os.Process) error
 }
 
 // NewManager creates a terminal manager with platform-appropriate shell.
 func NewManager(resolver ProjectResolver) *Manager {
 	shell, args := detectShell()
 	return &Manager{
-		terminals: make(map[string]*Terminal),
-		shellPath: shell,
-		shellArgs: args,
-		resolver:  resolver,
+		terminals:  make(map[string]*Terminal),
+		shellPath:  shell,
+		shellArgs:  args,
+		resolver:   resolver,
+		terminator: lifecycle.TerminateProcessTree,
 	}
 }
 
@@ -194,15 +198,24 @@ func (m *Manager) Close(id string) error {
 		return fmt.Errorf("terminal %s not found", id)
 	}
 	term.closed = true
-	delete(m.terminals, id)
 	m.mu.Unlock()
 
 	if term.stdin != nil {
 		_ = term.stdin.Close()
 	}
-	if term.cmd != nil && term.cmd.Process != nil {
-		_ = term.cmd.Process.Kill()
+	var process *os.Process
+	if term.cmd != nil {
+		process = term.cmd.Process
 	}
+	if err := m.terminateProcess(process); err != nil {
+		return fmt.Errorf("terminate terminal %s: %w", id, err)
+	}
+
+	m.mu.Lock()
+	if m.terminals[id] == term {
+		delete(m.terminals, id)
+	}
+	m.mu.Unlock()
 	return nil
 }
 
@@ -228,20 +241,35 @@ func (m *Manager) Status(id string) (*Status, error) {
 	}, nil
 }
 
-// CloseAll stops all running terminals.
-func (m *Manager) CloseAll() {
+// CloseAll stops all running terminals and their child processes.
+func (m *Manager) CloseAll() error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	var errs []error
 	for id, term := range m.terminals {
+		term.closed = true
 		if term.stdin != nil {
 			_ = term.stdin.Close()
 		}
-		if term.cmd != nil && term.cmd.Process != nil {
-			_ = term.cmd.Process.Kill()
+		var process *os.Process
+		if term.cmd != nil {
+			process = term.cmd.Process
+		}
+		if err := m.terminateProcess(process); err != nil {
+			errs = append(errs, fmt.Errorf("terminate terminal %s: %w", id, err))
+			continue
 		}
 		delete(m.terminals, id)
 	}
+	return errors.Join(errs...)
+}
+
+func (m *Manager) terminateProcess(process *os.Process) error {
+	if m.terminator != nil {
+		return m.terminator(process)
+	}
+	return lifecycle.TerminateProcessTree(process)
 }
 
 // copyWithContext copies from reader to writer until context is cancelled or reader closes.

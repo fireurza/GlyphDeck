@@ -2,6 +2,7 @@ package servers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	"glyphdeck/internal/lifecycle"
 	"glyphdeck/internal/opencode"
 )
 
@@ -217,29 +219,7 @@ func (m *ServerManager) Stop(ctx context.Context, projectID string) (ServerStatu
 	mp.state = StateStopping
 	m.mu.Unlock()
 
-	// Cancel the child context.
-	mp.cancel()
-
-	// Try graceful shutdown with interrupt signal.
-	done := make(chan struct{})
-	go func() {
-		_ = mp.cmd.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// Process exited cleanly.
-	case <-time.After(5 * time.Second):
-		// Graceful shutdown timed out — force kill.
-		_ = mp.cmd.Process.Kill()
-		select {
-		case <-done:
-		case <-time.After(2 * time.Second):
-			// On Windows, Kill may not propagate to child processes.
-			mp.cleanupProcess()
-		}
-	}
+	stopErr := mp.cleanupProcess()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -252,6 +232,9 @@ func (m *ServerManager) Stop(ctx context.Context, projectID string) (ServerStatu
 	}
 
 	delete(m.processes, projectID)
+	if stopErr != nil {
+		return ServerStatus{ProjectID: projectID, Status: StateStopped}, stopErr
+	}
 	return ServerStatus{
 		ProjectID: projectID,
 		Status:    StateStopped,
@@ -344,22 +327,15 @@ func (mp *managedProcess) isHealthy() bool {
 	return resp.StatusCode == http.StatusOK
 }
 
-// cleanupProcess forcefully terminates the process tree.
-func (mp *managedProcess) cleanupProcess() {
-	mp.cancel()
+// cleanupProcess terminates the exact tracked process tree before cancelling its context.
+func (mp *managedProcess) cleanupProcess() error {
 	if mp.cmd == nil || mp.cmd.Process == nil {
-		return
+		return nil
 	}
-	_ = mp.cmd.Process.Kill()
-	// On Windows, run taskkill to ensure child processes are terminated.
-	if mp.cmd.Process.Pid > 0 {
-		pidStr := strconv.Itoa(mp.cmd.Process.Pid)
-		killCmd := exec.Command("taskkill", "/PID", pidStr, "/F")
-		killCmd.Stdout = nil
-		killCmd.Stderr = nil
-		_ = killCmd.Run()
-	}
+	err := lifecycle.TerminateProcessTree(mp.cmd.Process)
+	mp.cancel()
 	_ = mp.cmd.Wait()
+	return err
 }
 
 // isNonTerminal returns true for states that are not stopped or failed.
@@ -380,14 +356,11 @@ func (m *ServerManager) StopAllAppOwned(ctx context.Context) ([]StoppedServerInf
 	defer m.mu.Unlock()
 
 	result := make([]StoppedServerInfo, 0, len(m.processes))
+	var stopErr error
 	for projectID, mp := range m.processes {
-		mp.cancel()
-		done := make(chan struct{})
-		go func() { _ = mp.cmd.Wait(); close(done) }()
-		select {
-		case <-done:
-		case <-time.After(3 * time.Second):
-			_ = mp.cmd.Process.Kill()
+		err := mp.cleanupProcess()
+		if m.eventBridge != nil {
+			m.eventBridge.StopEventBridge(projectID)
 		}
 
 		info := StoppedServerInfo{
@@ -399,10 +372,13 @@ func (m *ServerManager) StopAllAppOwned(ctx context.Context) ([]StoppedServerInf
 			info.PID = mp.cmd.Process.Pid
 		}
 		result = append(result, info)
+		if err != nil {
+			stopErr = errors.Join(stopErr, fmt.Errorf("stop app-owned server %s: %w", projectID, err))
+		}
 	}
 
 	m.processes = make(map[string]*managedProcess)
-	return result, nil
+	return result, stopErr
 }
 
 // allocatePort finds a free loopback TCP port.

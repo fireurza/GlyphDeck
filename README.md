@@ -201,12 +201,13 @@ Working directory: project root
 
 ## Known Limitations
 
-- **No auth.** GlyphDeck binds to 127.0.0.1 only. Do not expose to public networks.
+- **Local security boundary.** GlyphDeck accepts only loopback server binds and rejects mutation requests from non-loopback origins. It has no user authentication; do not expose it to public or private networks.
 - **Projects and Settings use SQLite.** The default database is `.glyphdeck/glyphdeck.db`; legacy projects JSON migrates on startup.
 - **No LAN/Tailscale binding.** Only localhost access.
 - **No installer.** Build and run the single binary manually.
 - **Terminal is pipe-based on Windows.** True PTY (ConPTY) is blocked with current Go libraries. The terminal uses `os/exec` with pipes — interactive shell works but no TTY resize, no signals.
-- **Servers and terminals are intentionally stopped at backend shutdown.** Their process state is not persisted across a backend restart; browser selection is restored from local storage and sessions are reloaded from the running OpenCode server.
+- **Servers and terminals are intentionally stopped at backend shutdown.** GlyphDeck terminates only its tracked process trees; their state is not persisted across a backend restart.
+- **OpenCode owns session state.** Browser selection is restored from local storage, but session lists and messages are reloaded from the running OpenCode server. When that server is unavailable, session operations show an unavailable state instead of using cached session data.
 - **Agent Terminal shows only live activity.** Does not backfill history from before session selection.
 - **Usage tab shows latest assistant message only.** Not per-message or cumulative totals.
 - **Review tab uses local `git` commands for file status.** No OpenCode VCS API integration yet.
