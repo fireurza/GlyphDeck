@@ -6,6 +6,13 @@ vi.mock('./api/events', () => ({
   useEventStream: () => ({ status: 'offline', latestEvent: null }),
 }))
 
+vi.mock('./api/auth', () => ({
+  fetchAuthStatus: () => Promise.resolve({ setupRequired: false, loginRequired: false, adminExists: true }),
+  setupAdmin: () => Promise.resolve(),
+  login: () => Promise.resolve(),
+  logout: () => Promise.resolve(),
+}))
+
 vi.mock('./layout/TopBar', () => ({
   default: () => <header data-testid="top-bar" />,
 }))
@@ -15,9 +22,7 @@ vi.mock('./layout/LeftPanel', () => ({
 }))
 
 vi.mock('./layout/ServersPanel', () => ({
-  default: () => (
-    <aside data-testid="left-panel-body" />
-  ),
+  default: () => <aside data-testid="left-panel-body" />,
 }))
 
 vi.mock('./layout/CenterPanel', () => ({
@@ -48,9 +53,12 @@ afterEach(() => {
   fetchSpy.mockRestore()
 })
 
-test('renders shell layout', () => {
+test('renders shell layout', async () => {
   render(<App />)
-  expect(screen.getByTestId('app-shell')).toBeInTheDocument()
+  // Wait for auth status to resolve.
+  await waitFor(() => {
+    expect(screen.getByTestId('app-shell')).toBeInTheDocument()
+  })
   expect(screen.getByTestId('top-bar')).toBeInTheDocument()
   expect(screen.getByTestId('left-panel-body')).toBeInTheDocument()
   expect(screen.getByTestId('center-panel')).toBeInTheDocument()
@@ -60,6 +68,11 @@ test('renders shell layout', () => {
 
 test('opens and closes Settings as a modal dialog', async () => {
   render(<App />)
+
+  // Wait for auth to load.
+  await waitFor(() => {
+    expect(screen.getByTestId('activity-settings-button')).toBeInTheDocument()
+  })
 
   const trigger = screen.getByTestId('activity-settings-button')
   expect(screen.queryByTestId('settings-dialog')).not.toBeInTheDocument()

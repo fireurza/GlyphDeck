@@ -6,11 +6,12 @@ interface ActivityRailProps {
   activeView: RailView
   onSelectView: (view: RailView) => void
   onOpenSettings: () => void
+  onLogout: () => void
   settingsOpen: boolean
   settingsButtonRef: RefObject<HTMLButtonElement | null>
 }
 
-function ActivityRail({ activeView, onSelectView, onOpenSettings, settingsOpen, settingsButtonRef }: ActivityRailProps) {
+function ActivityRail({ activeView, onSelectView, onOpenSettings, onLogout, settingsOpen, settingsButtonRef }: ActivityRailProps) {
   return (
     <nav className="activity-rail">
       <div className="activity-rail__items">
@@ -42,6 +43,14 @@ function ActivityRail({ activeView, onSelectView, onOpenSettings, settingsOpen, 
           data-testid="activity-settings-button"
         >
           ⚙️
+        </button>
+        <button
+          className="activity-rail__item activity-rail__item--logout"
+          title="Logout"
+          onClick={onLogout}
+          data-testid="activity-logout-button"
+        >
+          🚪
         </button>
       </div>
     </nav>

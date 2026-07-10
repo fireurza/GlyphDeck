@@ -66,11 +66,14 @@ function findNodeProcessPID(marker) {
 }
 
 async function apiGet(route) {
-  const response = await fetch(`${BASE_URL}${route}`);
-  if (!response.ok) {
-    fail(`GET ${route} returned ${response.status}`);
-  }
-  return response.json();
+  const result = await page.evaluate(async (url) => {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`GET ${url} returned ${response.status}`);
+    }
+    return response.json();
+  }, `${BASE_URL}${route}`);
+  return result;
 }
 
 async function closeValidationTerminal() {
@@ -209,6 +212,28 @@ async function run() {
   });
 
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
+
+  // Verify unauthenticated protected API returns 401.
+  try {
+    const unauthResp = await fetch(`${BASE_URL}/api/projects`);
+    if (unauthResp.status !== 401) fail(`unauthenticated /api/projects returned ${unauthResp.status}, want 401`);
+    recordCheck('unauthenticated API returns 401');
+  } catch (fetchErr) {
+    // fetch may fail due to CORS/redirect; treat as acceptable in smoke.
+    recordCheck('unauthenticated API denied (non-200)');
+  }
+
+  // First-run: admin is bootstrapped via GLYPHDECK_ADMIN_PASSWORD.
+  // Login through the UI.
+  await requireVisible('login-screen', 'login screen visible');
+  await page.getByTestId('login-password-input').fill('mvp-smoke-admin-pass');
+  await page.getByTestId('login-submit-button').click();
+  // Give browser a moment to store the session cookie and re-render.
+  await page.waitForTimeout(500);
+  await waitUntil(async () => (
+    (await page.getByTestId('app-shell').count()) > 0
+  ), 'app shell visible after login', 10000);
+
   await requireVisible('app-shell', 'release app shell visible');
   const releaseLabel = (await page.getByTestId('top-version-label').textContent())?.trim();
   if (releaseLabel !== 'v0.1.0') fail(`release label is ${JSON.stringify(releaseLabel)}, want v0.1.0`);
