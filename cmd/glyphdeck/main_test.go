@@ -1,6 +1,7 @@
 package main
 
 import (
+	"glyphdeck/internal/httpapi"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -41,8 +42,8 @@ func TestIsLoopbackHost(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.host, func(t *testing.T) {
-			if got := isLoopbackHost(tt.host); got != tt.want {
-				t.Fatalf("isLoopbackHost(%q) = %v, want %v", tt.host, got, tt.want)
+			if got := httpapi.IsLoopbackHost(tt.host); got != tt.want {
+				t.Fatalf("httpapi.IsLoopbackHost(%q) = %v, want %v", tt.host, got, tt.want)
 			}
 		})
 	}
@@ -121,14 +122,14 @@ func TestDevToolsEnabledRequiresExactFlag(t *testing.T) {
 	for _, value := range []string{"", "true", "yes", "0"} {
 		t.Run(value, func(t *testing.T) {
 			t.Setenv("GLYPHDECK_DEV_TOOLS", value)
-			if devToolsEnabled() {
-				t.Fatalf("devToolsEnabled() = true for %q, want false", value)
+			if httpapi.DevToolsEnabled() {
+				t.Fatalf("httpapi.DevToolsEnabled() = true for %q, want false", value)
 			}
 		})
 	}
 
 	t.Setenv("GLYPHDECK_DEV_TOOLS", "1")
-	if !devToolsEnabled() {
-		t.Fatal("devToolsEnabled() = false for explicit 1")
+	if !httpapi.DevToolsEnabled() {
+		t.Fatal("httpapi.DevToolsEnabled() = false for explicit 1")
 	}
 }

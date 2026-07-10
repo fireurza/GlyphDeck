@@ -21,9 +21,16 @@ func setupTestServer(t *testing.T, detector opencode.Detector, resolver ProjectR
 	return httptest.NewServer(mux)
 }
 
-func readErrorResponse(t *testing.T, body []byte) errorResponse {
+type testErrorResponse struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func readErrorResponse(t *testing.T, body []byte) testErrorResponse {
 	t.Helper()
-	var er errorResponse
+	var er testErrorResponse
 	if err := json.Unmarshal(body, &er); err != nil {
 		t.Fatalf("unmarshal error response: %v\nbody: %s", err, body)
 	}

@@ -104,6 +104,51 @@ func readSSELines(t *testing.T, resp *http.Response) []string {
 	return lines
 }
 
+func waitUntil(t *testing.T, label string, predicate func() bool) {
+	t.Helper()
+	deadline := time.After(2 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		if predicate() {
+			return
+		}
+		select {
+		case <-deadline:
+			t.Fatalf("%s timed out", label)
+		case <-ticker.C:
+		}
+	}
+}
+
+func waitForWaitGroup(t *testing.T, label string, wg *sync.WaitGroup) {
+	t.Helper()
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+
+	select {
+	case <-done:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("%s timed out", label)
+	}
+}
+
+func subscriberCount(h *Hub) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.subscribers)
+}
+
+func bridgeCount(h *Hub) int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.bridges)
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -158,8 +203,9 @@ func TestHub_SubscribeReceivesEvents(t *testing.T) {
 		}
 	}()
 
-	// Wait briefly for subscriber to connect.
-	time.Sleep(50 * time.Millisecond)
+	waitUntil(t, "subscriber connects", func() bool {
+		return subscriberCount(hub) == 1
+	})
 
 	// Send events.
 	mockStream.send(opencode.NormalizedEvent{
@@ -174,11 +220,14 @@ func TestHub_SubscribeReceivesEvents(t *testing.T) {
 		Data:      map[string]any{"sessionId": "ses_1", "messageId": "msg_1"},
 	})
 
-	// Give time for events to propagate, then force client disconnect.
-	time.Sleep(100 * time.Millisecond)
+	waitUntil(t, "subscriber receives events", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received) >= 2
+	})
 	mockStream.close()
 
-	wg.Wait()
+	waitForWaitGroup(t, "subscriber goroutine exits", &wg)
 	ts.Close()
 
 	mu.Lock()
@@ -237,22 +286,22 @@ func TestHub_ProjectFiltering(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitUntil(t, "project-filter subscriber connects", func() bool {
+		return subscriberCount(hub) == 1
+	})
 
-	// Send event for proj-1.
-	mockStream.send(opencode.NormalizedEvent{
+	// Synchronously fan out an event for proj-1. Subscriber is filtered to
+	// proj-2, so this should not enqueue any browser event.
+	hub.fanout("proj-1", opencode.NormalizedEvent{
 		Type: "opencode.session.updated",
 		Data: map[string]any{"sessionId": "ses_1"},
 	})
-
-	// Wait enough time for event to propagate (or not).
-	time.Sleep(200 * time.Millisecond)
 
 	// Kill the bridge by closing mock stream.
 	cancel()
 	mockStream.close()
 
-	wg.Wait()
+	waitForWaitGroup(t, "filtered subscriber goroutine exits", &wg)
 	ts.Close()
 
 	mu.Lock()
@@ -294,6 +343,9 @@ func TestHub_WildcardSubscriber(t *testing.T) {
 			line := scanner.Text()
 			if strings.HasPrefix(line, "data: ") {
 				be := parseBridgeEvent(t, line)
+				if strings.HasPrefix(be.Type, "glyphdeck.") {
+					continue
+				}
 				mu.Lock()
 				received = append(received, be)
 				mu.Unlock()
@@ -305,14 +357,16 @@ func TestHub_WildcardSubscriber(t *testing.T) {
 		}
 	}()
 
-	time.Sleep(50 * time.Millisecond)
+	waitUntil(t, "wildcard subscriber connects", func() bool {
+		return subscriberCount(hub) == 1
+	})
 
 	mockStream.send(opencode.NormalizedEvent{
 		Type: "opencode.session.updated",
 		Data: map[string]any{"sessionId": "ses_1"},
 	})
 
-	wg.Wait()
+	waitForWaitGroup(t, "wildcard subscriber goroutine exits", &wg)
 
 	mu.Lock()
 	defer mu.Unlock()
@@ -358,6 +412,9 @@ func TestHub_MultipleSubscribers(t *testing.T) {
 				line := scanner.Text()
 				if strings.HasPrefix(line, "data: ") {
 					be := parseBridgeEvent(t, line)
+					if strings.HasPrefix(be.Type, "glyphdeck.") {
+						continue
+					}
 					mu.Lock()
 					if idx == 0 {
 						received1 = append(received1, be)
@@ -374,17 +431,23 @@ func TestHub_MultipleSubscribers(t *testing.T) {
 		}(i)
 	}
 
-	time.Sleep(50 * time.Millisecond)
+	waitUntil(t, "both subscribers connect", func() bool {
+		return subscriberCount(hub) == 2
+	})
 
 	mockStream.send(opencode.NormalizedEvent{
 		Type: "opencode.session.updated",
 		Data: map[string]any{"sessionId": "ses_1"},
 	})
 
-	time.Sleep(200 * time.Millisecond)
+	waitUntil(t, "both subscribers receive events", func() bool {
+		mu.Lock()
+		defer mu.Unlock()
+		return len(received1) > 0 && len(received2) > 0
+	})
 	mockStream.close()
 
-	wg.Wait()
+	waitForWaitGroup(t, "multiple subscriber goroutines exit", &wg)
 	ts.Close()
 
 	mu.Lock()
@@ -413,52 +476,28 @@ func TestHub_SubscriberCleanupOnDisconnect(t *testing.T) {
 		Transport: &http.Transport{},
 	}
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		req, err := http.NewRequest("GET", ts.URL+"?projectId=proj-1", nil)
-		if err != nil {
-			t.Errorf("create request: %v", err)
-			return
-		}
-		resp, err := client.Do(req)
-		if err != nil {
-			// Expected on disconnect.
-			return
-		}
-		defer resp.Body.Close()
+	req, err := http.NewRequest("GET", ts.URL+"?projectId=proj-1", nil)
+	if err != nil {
+		t.Fatalf("create request: %v", err)
+	}
+	resp, err := client.Do(req)
+	if err != nil {
+		t.Fatalf("GET events stream: %v", err)
+	}
 
-		// Read one line then disconnect.
-		scanner := bufio.NewScanner(resp.Body)
-		for scanner.Scan() {
-			_ = scanner.Text()
-			cancel() // kill the bridge, which causes client to disconnect
-			return
-		}
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-
-	mockStream.send(opencode.NormalizedEvent{
-		Type: "opencode.session.updated",
-		Data: map[string]any{"sessionId": "ses_1"},
+	waitUntil(t, "cleanup subscriber connects", func() bool {
+		return subscriberCount(hub) == 1
 	})
 
-	wg.Wait()
-
-	// Stop the bridge and allow subscriber cleanup to propagate.
-	mockStream.close()
-	time.Sleep(50 * time.Millisecond)
-
-	// Check subscriber count is 0.
-	hub.mu.RLock()
-	count := len(hub.subscribers)
-	hub.mu.RUnlock()
-
-	if count != 0 {
-		t.Errorf("subscriber count = %d, want 0 after disconnect", count)
+	if err := resp.Body.Close(); err != nil {
+		t.Fatalf("close response body: %v", err)
 	}
+	mockStream.close()
+	cancel()
+
+	waitUntil(t, "subscriber cleanup completes", func() bool {
+		return subscriberCount(hub) == 0
+	})
 }
 
 func TestHub_StopBridge(t *testing.T) {
@@ -481,8 +520,9 @@ func TestHub_StopBridge(t *testing.T) {
 	// Stop the bridge.
 	hub.StopEventBridge("proj-1")
 
-	// Wait briefly for goroutine cleanup.
-	time.Sleep(50 * time.Millisecond)
+	waitUntil(t, "bridge cleanup completes", func() bool {
+		return bridgeCount(hub) == 0
+	})
 
 	// Verify bridge removed.
 	hub.mu.RLock()
@@ -513,7 +553,9 @@ func TestHub_StopAll(t *testing.T) {
 
 	hub.StopAll()
 
-	time.Sleep(50 * time.Millisecond)
+	waitUntil(t, "all bridge cleanup completes", func() bool {
+		return bridgeCount(hub) == 0
+	})
 
 	hub.mu.RLock()
 	count = len(hub.bridges)

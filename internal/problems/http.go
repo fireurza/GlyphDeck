@@ -1,7 +1,7 @@
 package problems
 
 import (
-	"encoding/json"
+	"glyphdeck/internal/httpapi"
 	"net/http"
 )
 
@@ -24,20 +24,10 @@ func RegisterHandlers(mux *http.ServeMux, manager *Manager) {
 
 func (h *Handler) listProblems(w http.ResponseWriter, r *http.Request) {
 	problems := h.manager.List()
-	writeJSON(w, http.StatusOK, problems)
+	httpapi.WriteJSON(w, http.StatusOK, problems)
 }
 
 func (h *Handler) clearProblems(w http.ResponseWriter, r *http.Request) {
 	h.manager.Clear()
 	w.WriteHeader(http.StatusNoContent)
-}
-
-// ---------------------------------------------------------------------------
-// HTTP helpers
-// ---------------------------------------------------------------------------
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
 }
