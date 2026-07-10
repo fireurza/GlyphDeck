@@ -109,3 +109,14 @@ type PermissionToolRef struct {
 type PermissionReply struct {
 	Reply string `json:"reply"`
 }
+
+// ServerResolver resolves a ready OpenCode server's base URL for a given project.
+type ServerResolver interface {
+	GetBaseURL(ctx context.Context, projectID string) (string, error)
+}
+
+// ProjectPaths carries the minimal project fields needed to interact with an OpenCode server.
+type ProjectPaths struct {
+	ID   string
+	Path string
+}
