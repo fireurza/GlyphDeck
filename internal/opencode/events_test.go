@@ -133,40 +133,46 @@ func TestStreamEvents_RealFormat_MessageEvents(t *testing.T) {
 	events, _ := client.StreamEvents(ctx)
 	got := collectUntil(ctx, events, 4) // connected + 3 events
 
-	// Connected must be emitted on the successful 200 handshake.
-	if findByType(got, "glyphdeck.eventstream.connected") == nil {
-		t.Errorf("expected glyphdeck.eventstream.connected; got %+v", got)
-	}
+	t.Run("connected", func(t *testing.T) {
+		if findByType(got, "glyphdeck.eventstream.connected") == nil {
+			t.Errorf("expected glyphdeck.eventstream.connected; got %+v", got)
+		}
+	})
 
-	sess := findByType(got, "opencode.session.updated")
-	if sess == nil {
-		t.Fatalf("missing opencode.session.updated; got %+v", got)
-	}
-	if sess.SessionID != "ses_1" {
-		t.Errorf("session.updated SessionID = %q, want ses_1", sess.SessionID)
-	}
+	t.Run("session.updated", func(t *testing.T) {
+		sess := findByType(got, "opencode.session.updated")
+		if sess == nil {
+			t.Fatalf("missing opencode.session.updated; got %+v", got)
+		}
+		if sess.SessionID != "ses_1" {
+			t.Errorf("session.updated SessionID = %q, want ses_1", sess.SessionID)
+		}
+	})
 
-	msg := findByType(got, "opencode.message.updated")
-	if msg == nil {
-		t.Fatalf("missing opencode.message.updated")
-	}
-	if msg.SessionID != "ses_1" || msg.MessageID != "msg_1" {
-		t.Errorf("message.updated ids = (%q,%q), want (ses_1,msg_1)", msg.SessionID, msg.MessageID)
-	}
+	t.Run("message.updated", func(t *testing.T) {
+		msg := findByType(got, "opencode.message.updated")
+		if msg == nil {
+			t.Fatalf("missing opencode.message.updated")
+		}
+		if msg.SessionID != "ses_1" || msg.MessageID != "msg_1" {
+			t.Errorf("message.updated ids = (%q,%q), want (ses_1,msg_1)", msg.SessionID, msg.MessageID)
+		}
+	})
 
-	part := findByType(got, "opencode.message.part.updated")
-	if part == nil {
-		t.Fatalf("missing opencode.message.part.updated")
-	}
-	if part.SessionID != "ses_1" || part.MessageID != "msg_1" {
-		t.Errorf("part.updated ids = (%q,%q), want (ses_1,msg_1)", part.SessionID, part.MessageID)
-	}
-	// Payload must be the properties object (what the browser consumes).
-	if m, ok := part.Data.(map[string]any); !ok {
-		t.Errorf("part.updated Data is not properties map: %T", part.Data)
-	} else if _, ok := m["part"]; !ok {
-		t.Errorf("part.updated Data missing 'part' key: %v", m)
-	}
+	t.Run("message.part.updated", func(t *testing.T) {
+		part := findByType(got, "opencode.message.part.updated")
+		if part == nil {
+			t.Fatalf("missing opencode.message.part.updated")
+		}
+		if part.SessionID != "ses_1" || part.MessageID != "msg_1" {
+			t.Errorf("part.updated ids = (%q,%q), want (ses_1,msg_1)", part.SessionID, part.MessageID)
+		}
+		if m, ok := part.Data.(map[string]any); !ok {
+			t.Errorf("part.updated Data is not properties map: %T", part.Data)
+		} else if _, ok := m["part"]; !ok {
+			t.Errorf("part.updated Data missing 'part' key: %v", m)
+		}
+	})
 }
 
 func TestStreamEvents_RealFormat_Delta(t *testing.T) {
