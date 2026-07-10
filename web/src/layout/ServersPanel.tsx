@@ -14,13 +14,16 @@ interface ActiveServer {
   attached: boolean
 }
 
-function ServersPanel() {
+interface ServersPanelProps {}
+
+function ServersPanel(_props: ServersPanelProps) {
   const [configs, setConfigs] = useState<ServerConfig[]>([])
   const [active, setActive] = useState<ActiveServer | null>(null)
+  const [statuses, setStatuses] = useState<Record<string, string>>({}) // id -> online|offline|unknown
+  const [checking, setChecking] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Add form state
   const [showAdd, setShowAdd] = useState(false)
   const [addId, setAddId] = useState('')
   const [addName, setAddName] = useState('')
@@ -45,9 +48,7 @@ function ServersPanel() {
       if (!resp.ok) return
       const data = await resp.json()
       setActive(data.attached ? data : null)
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   }, [])
 
   useEffect(() => {
@@ -101,7 +102,6 @@ function ServersPanel() {
       })
       if (!resp.ok) throw new Error('Failed to attach')
       await loadActive()
-      // Clear stale state: sessions, review, usage will be handled by App-level detach
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to attach to server')
     }
@@ -112,11 +112,30 @@ function ServersPanel() {
       const resp = await fetch('/api/active-server/detach', { method: 'POST' })
       if (!resp.ok) throw new Error('Failed to detach')
       setActive(null)
-      // App-level handler will clear sessions/review/usage
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to detach')
     }
   }, [])
+
+  const handleCheck = useCallback(async (cfg: ServerConfig) => {
+    setChecking((prev) => ({ ...prev, [cfg.id]: true }))
+    try {
+      const resp = await fetch(`/api/server-configs/${encodeURIComponent(cfg.id)}/check`, { method: 'POST' })
+      if (!resp.ok) throw new Error('Check failed')
+      const data = await resp.json()
+      setStatuses((prev) => ({ ...prev, [cfg.id]: data.status }))
+    } catch {
+      setStatuses((prev) => ({ ...prev, [cfg.id]: 'offline' }))
+    } finally {
+      setChecking((prev) => ({ ...prev, [cfg.id]: false }))
+    }
+  }, [])
+
+  function statusDot(status: string | undefined) {
+    const s = status || 'unknown'
+    const color = s === 'online' ? 'green' : s === 'offline' ? 'red' : 'gray'
+    return <span className={`server-status-dot server-status-dot--${color}`} title={s} />
+  }
 
   if (loading) {
     return (
@@ -137,7 +156,6 @@ function ServersPanel() {
           <p className="project-message project-message--error" role="alert">{error}</p>
         ) : null}
 
-        {/* Active server indicator */}
         <div className="server-active-section">
           {active ? (
             <div className="server-active server-active--online">
@@ -158,7 +176,6 @@ function ServersPanel() {
           )}
         </div>
 
-        {/* Server config list */}
         <div className="server-list" aria-live="polite">
           {configs.length === 0 && !showAdd ? (
             <p className="project-message project-message--empty">No servers configured.</p>
@@ -166,11 +183,18 @@ function ServersPanel() {
 
           {configs.map((cfg) => {
             const isActive = active?.serverId === cfg.id
+            const st = statuses[cfg.id]
+            const isChecking = checking[cfg.id]
             return (
               <div className="server-card" key={cfg.id} data-testid={`server-card-${cfg.id}`}>
                 <div className="server-card__main">
-                  <h3 className="server-card__name">{cfg.name}</h3>
-                  <p className="server-card__type">{cfg.type === 'local' ? 'Local' : cfg.type === 'manual_url' ? 'Manual URL' : 'SSH Alias'}</p>
+                  <div className="server-card__header">
+                    {statusDot(st)}
+                    <h3 className="server-card__name">{cfg.name}</h3>
+                  </div>
+                  <p className="server-card__type">
+                    {cfg.type === 'local' ? 'Local' : cfg.type === 'manual_url' ? 'Manual URL' : 'SSH Alias'}
+                  </p>
                   {cfg.url ? <p className="server-card__url">{cfg.url}</p> : null}
                   {cfg.sshAlias ? <p className="server-card__ssh">SSH: {cfg.sshAlias}</p> : null}
                 </div>
@@ -187,6 +211,14 @@ function ServersPanel() {
                     </button>
                   )}
                   <button
+                    className="server-btn server-btn--check"
+                    onClick={() => handleCheck(cfg)}
+                    disabled={isChecking}
+                    data-testid={`check-${cfg.id}`}
+                  >
+                    {isChecking ? 'Checking…' : 'Check'}
+                  </button>
+                  <button
                     className="server-btn server-btn--remove"
                     onClick={() => handleDelete(cfg.id)}
                     disabled={isActive}
@@ -200,7 +232,6 @@ function ServersPanel() {
           })}
         </div>
 
-        {/* Add form */}
         {showAdd ? (
           <form className="server-form" onSubmit={(e) => { e.preventDefault(); handleAdd() }}>
             <div className="server-form__field">

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"glyphdeck/internal/httpapi"
 )
@@ -24,6 +25,7 @@ func RegisterHandlers(mux *http.ServeMux, registry *Registry) {
 	mux.HandleFunc("GET /api/server-configs", h.listConfigs)
 	mux.HandleFunc("POST /api/server-configs", h.addConfig)
 	mux.HandleFunc("DELETE /api/server-configs/{id}", h.deleteConfig)
+	mux.HandleFunc("POST /api/server-configs/{id}/check", h.checkConfig)
 }
 
 func (h *Handler) listConfigs(w http.ResponseWriter, r *http.Request) {
@@ -83,4 +85,42 @@ func (h *Handler) deleteConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) checkConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	cfg, err := h.registry.Get(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			httpapi.WriteError(w, http.StatusNotFound, "not_found", "Server config not found.")
+			return
+		}
+		httpapi.WriteError(w, http.StatusInternalServerError, "server_configs_error", err.Error())
+		return
+	}
+
+	status := "unknown"
+	if cfg.Type == TypeSSHAlias && cfg.URL == "" {
+		status = "unknown" // SSH-only targets not checkable yet
+	} else {
+		targetURL := cfg.URL
+		if targetURL == "" && cfg.Type == TypeLocal {
+			targetURL = "http://127.0.0.1:4096"
+		}
+		if targetURL != "" {
+			client := &http.Client{Timeout: 3 * time.Second}
+			resp, err := client.Get(targetURL + "/health")
+			if err == nil && resp.StatusCode < 500 {
+				status = "online"
+				resp.Body.Close()
+			} else {
+				status = "offline"
+			}
+		}
+	}
+
+	httpapi.WriteJSON(w, http.StatusOK, map[string]string{
+		"id":     cfg.ID,
+		"status": status,
+	})
 }
