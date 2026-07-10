@@ -5,6 +5,7 @@
  * execution, so every generated artifact stays in the milestone directory.
  */
 const { chromium } = require('playwright');
+const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -24,6 +25,7 @@ const VIEWPORT = { width: 1280, height: 720 };
 
 const screenshots = [];
 const checks = [];
+const browserErrors = [];
 let page;
 let browser;
 let validationTerminalID;
@@ -48,6 +50,21 @@ function isProcessAlive(pid) {
   }
 }
 
+function findNodeProcessPID(marker) {
+  const escapedMarker = marker.replace(/'/g, "''");
+  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' -and $_.CommandLine -like '*${escapedMarker}*' } | Select-Object -First 1 -ExpandProperty ProcessId`;
+  try {
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }).trim();
+    const pid = Number(output);
+    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function apiGet(route) {
   const response = await fetch(`${BASE_URL}${route}`);
   if (!response.ok) {
@@ -65,7 +82,7 @@ async function closeValidationTerminal() {
       { method: 'POST' },
     );
     if (!response.ok && response.status !== 404) {
-      console.error(`[cleanup] terminal close returned ${response.status}`);
+      console.error(`[cleanup] terminal close returned ${response.status}: ${await response.text()}`);
     }
   } catch (error) {
     console.error(`[cleanup] terminal close failed: ${error.message}`);
@@ -182,6 +199,14 @@ async function run() {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: VIEWPORT });
   page = await context.newPage();
+  page.on('pageerror', (error) => {
+    browserErrors.push(`pageerror: ${error.message}`);
+  });
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      browserErrors.push(`console: ${message.text()}`);
+    }
+  });
 
   await page.goto(BASE_URL, { waitUntil: 'domcontentloaded' });
   await requireVisible('app-shell', 'release app shell visible');
@@ -332,18 +357,15 @@ async function run() {
   await screenshot('12-terminal-marker-visible.png', 'Terminal marker output visible');
 
   const childMarker = `GLYPHDECK_MVP_CHILD_${RUN_ID.toUpperCase()}`;
-  const childCommand = `$p = Start-Process -FilePath node.exe -ArgumentList @('-e', 'setInterval(() => {}, 1000)') -PassThru; Write-Output '${childMarker}=' + $p.Id`;
+  const childCommand = `Start-Process -FilePath node.exe -ArgumentList @('-e', 'setInterval(() => {}, 1000)', '--${childMarker}')`;
   await page.getByTestId('user-terminal-input').fill(childCommand);
   await page.getByTestId('user-terminal-input').press('Enter');
-  await waitUntil(async () => (
-    ((await page.getByTestId('user-terminal-output').textContent()) || '').includes(childMarker)
-  ), 'terminal child process started', 15000);
-  const terminalOutput = (await page.getByTestId('user-terminal-output').textContent()) || '';
-  const childPIDMatch = terminalOutput.match(new RegExp(`${childMarker}=(\\d+)`));
-  const childPID = Number(childPIDMatch?.[1]);
-  if (!Number.isInteger(childPID) || childPID <= 0) {
-    fail('terminal child process did not report a valid PID');
-  }
+  let childPID;
+  await waitUntil(() => {
+    childPID = findNodeProcessPID(childMarker);
+    return Boolean(childPID);
+  }, 'terminal child process started', 15000);
+  if (!childPID) fail('terminal child process did not report a valid PID');
   recordCheck('terminal child process PID tracked');
 
   await page.getByTestId('user-terminal-close-button').click();
@@ -416,6 +438,9 @@ async function run() {
     console.log('=== v0.1.0 Release Candidate Smoke PASSED ===');
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
+    if (browserErrors.length > 0) {
+      failure += `\nBrowser errors:\n${browserErrors.join('\n')}`;
+    }
     console.error(`=== v0.1.0 Release Candidate Smoke FAILED: ${failure} ===`);
     if (page) {
       try {

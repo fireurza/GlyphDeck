@@ -158,15 +158,24 @@ func (m *ServerManager) Start(ctx context.Context, projectID string) (ServerStat
 		m.mu.Unlock()
 		return ServerStatus{}, fmt.Errorf("start opencode server: %w", err)
 	}
+	processTree, err := lifecycle.AttachProcessTree(cmd.Process)
+	if err != nil {
+		_ = lifecycle.TerminateProcessTree(cmd.Process)
+		_ = cmd.Wait()
+		cancel()
+		m.mu.Unlock()
+		return ServerStatus{}, fmt.Errorf("attach OpenCode server process tree: %w", err)
+	}
 
 	mp := &managedProcess{
-		projectID: projectID,
-		cmd:       cmd,
-		port:      port,
-		cancel:    cancel,
-		startedAt: time.Now(),
-		version:   detection.Version,
-		state:     StateStarting,
+		projectID:   projectID,
+		cmd:         cmd,
+		processTree: processTree,
+		port:        port,
+		cancel:      cancel,
+		startedAt:   time.Now(),
+		version:     detection.Version,
+		state:       StateStarting,
 	}
 	m.processes[projectID] = mp
 	m.mu.Unlock()
@@ -332,7 +341,12 @@ func (mp *managedProcess) cleanupProcess() error {
 	if mp.cmd == nil || mp.cmd.Process == nil {
 		return nil
 	}
-	err := lifecycle.TerminateProcessTree(mp.cmd.Process)
+	var err error
+	if mp.processTree != nil {
+		err = mp.processTree.Close()
+	} else {
+		err = lifecycle.TerminateProcessTree(mp.cmd.Process)
+	}
 	mp.cancel()
 	_ = mp.cmd.Wait()
 	return err
