@@ -106,8 +106,11 @@ func readSSELines(t *testing.T, resp *http.Response) []string {
 
 func waitUntil(t *testing.T, label string, predicate func() bool) {
 	t.Helper()
-	deadline := time.After(2 * time.Second)
-	ticker := time.NewTicker(10 * time.Millisecond)
+	if predicate() {
+		return
+	}
+	deadline := time.After(500 * time.Millisecond)
+	ticker := time.NewTicker(time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -116,7 +119,7 @@ func waitUntil(t *testing.T, label string, predicate func() bool) {
 		}
 		select {
 		case <-deadline:
-			t.Fatalf("%s timed out", label)
+			t.Fatalf("%s timed out after 500ms", label)
 		case <-ticker.C:
 		}
 	}
@@ -133,7 +136,7 @@ func waitForWaitGroup(t *testing.T, label string, wg *sync.WaitGroup) {
 	select {
 	case <-done:
 	case <-time.After(2 * time.Second):
-		t.Fatalf("%s timed out", label)
+		t.Fatalf("%s timed out after 2s", label)
 	}
 }
 
