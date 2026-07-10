@@ -59,14 +59,14 @@ Desktop Docker Sandbox mode: not used
 
 | Milestone | Status | Reason |
 |---|---:|---|
-| v0.1.0 — Release hardening correction | In progress | User release bar supersedes the prior acceptance. Local `v0.1.0` tag was removed; security, shutdown, session, hygiene, CI, and quality gates remain open. |
+| v0.1.0 — Release hardening correction | In progress | User release bar supersedes the prior acceptance. Local `v0.1.0` tag was removed; hardening branch gates passed locally, but final release acceptance/tag is not yet authorized. |
 ---
 
 ## Current Next Step
 
-Complete the v0.1.0 release-hardening correction. Do not create `v0.1.0` again
-until every release gate passes. No post-v0.1.0 milestone work is authorized by
-this file.
+Keep v0.1.0 in release-hardening correction until explicit final release
+acceptance. Do not create `v0.1.0` yet. No post-v0.1.0 milestone work is
+authorized by this file.
 
 M14 accepted (terminal SSE streaming fix — marker output reliably visible).
 
@@ -76,16 +76,12 @@ their manifest were reviewed for the Milestone 14 label, terminal marker/output,
 terminal open/close states, Review/Usage/Agent Terminal/Terminal/Problems/Settings
 panel integrity, layout clipping, and unexpected error banners.
 
-v0.1.0 release-candidate acceptance (2026-07-09, feature commit `6778e4a`): the embedded release binary
-passed the isolated `mvp` browser smoke with 17 fresh screenshots and a manifest
-under `.glyphdeck/validation/mvp/screenshots/`. The activity-rail Settings trigger
-opens a centered modal above the dock; SQLite-backed Settings persistence, close/
-Escape focus return, project/server/session lifecycle, panels, terminal marker,
-and shutdown were asserted. Vision/manual review PASS. The primary image viewer
-intermittently rendered partial frames for unchanged PNGs, so all source frames
-were also reviewed through a stable local decode/re-encode path under
-`.glyphdeck/validation/mvp/vision/`; the fresh source PNGs and manifest remain
-the acceptance evidence.
+Prior v0.1.0 release-candidate acceptance (2026-07-09, feature commit
+`6778e4a`) is superseded by the release-hardening correction. The current
+hardening branch re-ran the isolated `mvp` smoke successfully with 17 fresh
+screenshots under `.glyphdeck/validation/mvp/screenshots/`, but this file must
+not mark v0.1.0 accepted or tagged until the user authorizes final release
+acceptance.
 
 The Stop Server/session-list overlap carried forward from Milestone 4 is
 fixed and verified (root-caused via DOM measurement, re-verified in the M5
