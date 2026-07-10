@@ -6,7 +6,7 @@ Write-Host "=== GlyphDeck Release Build ==="
 # Build frontend
 Write-Host "[1/2] Building frontend..."
 Set-Location (Join-Path $repoRoot "web")
-& cmd.exe /c "npm.cmd run build" 2>&1 | Out-Null
+& npm.cmd run build 2>&1 | Out-Null
 if ($LASTEXITCODE -ne 0) { throw "Frontend build failed" }
 Write-Host "[frontend] OK"
 

@@ -91,8 +91,8 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-- localhost-only / no auth remains the v0.1.0 security boundary.
-- Windows terminal remains pipe-based rather than true PTY.
-- App-owned servers and terminals stop at backend shutdown.
-- Sessions come from the running OpenCode server; GlyphDeck restores selection
-  only.
+- App-owned servers and terminals do not survive backend shutdown.
+- Sessions come from the running OpenCode server; GlyphDeck restores selection only.
+- Windows ConPTY implementation exists in `internal/terminal/session_windows.go` but is
+  disabled (pipe-based fallback used). The smoke-test child-process WMI-detection step
+  fails when ConPTY is active; this must be resolved before enabling the PTY path.
