@@ -49,6 +49,8 @@ func TestIsLoopbackHost(t *testing.T) {
 }
 
 func TestLocalMutationGuard(t *testing.T) {
+	t.Setenv("GLYPHDECK_DEV_TOOLS", "")
+
 	guard := localMutationGuard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -61,7 +63,8 @@ func TestLocalMutationGuard(t *testing.T) {
 		want   int
 	}{
 		{name: "loopback same origin", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://127.0.0.1:8756", want: http.StatusNoContent},
-		{name: "loopback Vite origin", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://localhost:5173", want: http.StatusNoContent},
+		{name: "different loopback port rejected in release mode", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://127.0.0.1:5173", want: http.StatusForbidden},
+		{name: "different loopback hostname rejected in release mode", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://localhost:8756", want: http.StatusForbidden},
 		{name: "cross origin mutation", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://evil.example", want: http.StatusForbidden},
 		{name: "non-loopback host", method: http.MethodPost, host: "example.com", want: http.StatusForbidden},
 		{name: "cross origin read", method: http.MethodGet, host: "127.0.0.1:8756", origin: "http://evil.example", want: http.StatusNoContent},
@@ -81,5 +84,51 @@ func TestLocalMutationGuard(t *testing.T) {
 				t.Fatalf("status = %d, want %d", res.Code, tt.want)
 			}
 		})
+	}
+}
+
+func TestLocalMutationGuardAllowsDevLoopbackOriginOnlyWithDevTools(t *testing.T) {
+	guard := localMutationGuard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8756/api/test", nil)
+	req.Host = "127.0.0.1:8756"
+	req.Header.Set("Origin", "http://localhost:5173")
+
+	res := httptest.NewRecorder()
+	guard.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("dev loopback origin without GLYPHDECK_DEV_TOOLS status = %d, want %d", res.Code, http.StatusForbidden)
+	}
+
+	t.Setenv("GLYPHDECK_DEV_TOOLS", "1")
+	res = httptest.NewRecorder()
+	guard.ServeHTTP(res, req)
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("dev loopback origin with GLYPHDECK_DEV_TOOLS status = %d, want %d", res.Code, http.StatusNoContent)
+	}
+
+	t.Setenv("GLYPHDECK_DEV_TOOLS", "true")
+	res = httptest.NewRecorder()
+	guard.ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("dev loopback origin with non-explicit value status = %d, want %d", res.Code, http.StatusForbidden)
+	}
+}
+
+func TestDevToolsEnabledRequiresExactFlag(t *testing.T) {
+	for _, value := range []string{"", "true", "yes", "0"} {
+		t.Run(value, func(t *testing.T) {
+			t.Setenv("GLYPHDECK_DEV_TOOLS", value)
+			if devToolsEnabled() {
+				t.Fatalf("devToolsEnabled() = true for %q, want false", value)
+			}
+		})
+	}
+
+	t.Setenv("GLYPHDECK_DEV_TOOLS", "1")
+	if !devToolsEnabled() {
+		t.Fatal("devToolsEnabled() = false for explicit 1")
 	}
 }
