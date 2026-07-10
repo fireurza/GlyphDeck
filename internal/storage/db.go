@@ -102,6 +102,16 @@ func (db *DB) migrate() error {
 		key TEXT PRIMARY KEY,
 		value TEXT NOT NULL
 	);
+
+	CREATE TABLE IF NOT EXISTS server_configs (
+		id TEXT PRIMARY KEY,
+		name TEXT NOT NULL DEFAULT '',
+		type TEXT NOT NULL DEFAULT 'local',
+		url TEXT NOT NULL DEFAULT '',
+		ssh_alias TEXT NOT NULL DEFAULT '',
+		created_at TEXT NOT NULL DEFAULT (datetime('now')),
+		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+	);
 	`
 
 	_, err := db.conn.Exec(schema)

@@ -78,3 +78,41 @@ type managedProcess struct {
 	version     string
 	state       string
 }
+
+// ActiveServer tracks the currently attached OpenCode server target.
+type ActiveServer struct {
+	ServerID string `json:"serverId"`
+	BaseURL  string `json:"baseUrl"`
+	Attached bool   `json:"attached"`
+}
+
+// Attach sets the active server. The caller is responsible for verifying
+// reachability. Pass an empty serverID to detach.
+func (m *ServerManager) Attach(serverID, baseURL string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.activeServerID = serverID
+	m.activeBaseURL = baseURL
+}
+
+// Detach clears the active server.
+func (m *ServerManager) Detach() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.activeServerID = ""
+	m.activeBaseURL = ""
+}
+
+// Active returns the currently attached server.
+func (m *ServerManager) Active() ActiveServer {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.activeServerID == "" {
+		return ActiveServer{}
+	}
+	return ActiveServer{
+		ServerID: m.activeServerID,
+		BaseURL:  m.activeBaseURL,
+		Attached: true,
+	}
+}
