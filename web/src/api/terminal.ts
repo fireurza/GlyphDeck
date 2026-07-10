@@ -3,6 +3,26 @@ import { requestJson } from './client'
 
 const BACKEND = ''
 
+async function requestNoContent(url: string, init: RequestInit): Promise<void> {
+  const response = await fetch(url, init)
+  if (response.ok) return
+
+  let message = `Request failed (${response.status}).`
+  try {
+    const payload = (await response.json()) as { error?: { message?: string } | string; message?: string }
+    if (typeof payload.error === 'object' && payload.error?.message) {
+      message = payload.error.message
+    } else if (typeof payload.error === 'string') {
+      message = payload.error
+    } else if (payload.message) {
+      message = payload.message
+    }
+  } catch {
+    // Preserve the safe status fallback.
+  }
+  throw new Error(message)
+}
+
 export async function startTerminal(
   projectId: string,
   cwd: string,
@@ -60,7 +80,7 @@ export async function sendTerminalInput(
   terminalId: string,
   input: string,
 ): Promise<void> {
-  await fetch(
+  await requestNoContent(
     `/api/terminals/${encodeURIComponent(terminalId)}/input`,
     {
       method: 'POST',
@@ -75,7 +95,7 @@ export async function resizeTerminal(
   rows: number,
   cols: number,
 ): Promise<void> {
-  await fetch(
+  await requestNoContent(
     `/api/terminals/${encodeURIComponent(terminalId)}/resize`,
     {
       method: 'POST',
@@ -86,7 +106,7 @@ export async function resizeTerminal(
 }
 
 export async function closeTerminal(terminalId: string): Promise<void> {
-  await fetch(
+  await requestNoContent(
     `/api/terminals/${encodeURIComponent(terminalId)}/close`,
     { method: 'POST' },
   )

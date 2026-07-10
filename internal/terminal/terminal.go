@@ -16,15 +16,16 @@ import (
 
 // Terminal represents a running interactive shell session.
 type Terminal struct {
-	ID        string
-	ProjectID string
-	Cwd       string
-	cmd       *exec.Cmd
-	stdin     io.WriteCloser
-	stdout    io.ReadCloser
-	mu        sync.Mutex
-	closed    bool
-	createdAt time.Time
+	ID          string
+	ProjectID   string
+	Cwd         string
+	cmd         *exec.Cmd
+	processTree lifecycle.ProcessTree
+	stdin       io.WriteCloser
+	stdout      io.ReadCloser
+	mu          sync.Mutex
+	closed      bool
+	createdAt   time.Time
 }
 
 // Status reports the terminal running state.
@@ -114,6 +115,12 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
+	processTree, err := lifecycle.AttachProcessTree(cmd.Process)
+	if err != nil {
+		_ = lifecycle.TerminateProcessTree(cmd.Process)
+		_ = cmd.Wait()
+		return nil, fmt.Errorf("attach shell process tree: %w", err)
+	}
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -122,13 +129,14 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 	id := fmt.Sprintf("term-%d", m.nextID)
 
 	term := &Terminal{
-		ID:        id,
-		ProjectID: projectID,
-		Cwd:       cwd,
-		cmd:       cmd,
-		stdin:     stdin,
-		stdout:    stdout,
-		createdAt: time.Now(),
+		ID:          id,
+		ProjectID:   projectID,
+		Cwd:         cwd,
+		cmd:         cmd,
+		processTree: processTree,
+		stdin:       stdin,
+		stdout:      stdout,
+		createdAt:   time.Now(),
 	}
 
 	m.terminals[id] = term
@@ -207,7 +215,7 @@ func (m *Manager) Close(id string) error {
 	if term.cmd != nil {
 		process = term.cmd.Process
 	}
-	if err := m.terminateProcess(process); err != nil {
+	if err := m.terminateProcessTree(term.processTree, process); err != nil {
 		return fmt.Errorf("terminate terminal %s: %w", id, err)
 	}
 
@@ -256,7 +264,7 @@ func (m *Manager) CloseAll() error {
 		if term.cmd != nil {
 			process = term.cmd.Process
 		}
-		if err := m.terminateProcess(process); err != nil {
+		if err := m.terminateProcessTree(term.processTree, process); err != nil {
 			errs = append(errs, fmt.Errorf("terminate terminal %s: %w", id, err))
 			continue
 		}
@@ -265,7 +273,10 @@ func (m *Manager) CloseAll() error {
 	return errors.Join(errs...)
 }
 
-func (m *Manager) terminateProcess(process *os.Process) error {
+func (m *Manager) terminateProcessTree(tree lifecycle.ProcessTree, process *os.Process) error {
+	if tree != nil {
+		return tree.Close()
+	}
 	if m.terminator != nil {
 		return m.terminator(process)
 	}

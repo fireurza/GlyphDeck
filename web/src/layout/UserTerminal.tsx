@@ -109,8 +109,10 @@ function UserTerminal({ selectedProjectId }: UserTerminalProps) {
     abortRef.current?.abort()
     try {
       await closeTerminal(terminalId)
-    } catch {
-      /* Best-effort. */
+    } catch (err) {
+      setState('error')
+      setErrorMsg(err instanceof Error ? err.message : 'Could not close terminal.')
+      return
     }
     // Flush any remaining buffered text.
     if (outputBufferRef.current) {

@@ -18,8 +18,10 @@ a new tag until every gate in this document passes.
 
 - OpenCode servers and User Terminal shells are app-owned only when GlyphDeck
   starts and tracks their process IDs.
-- Windows cleanup targets the tracked PID with `taskkill /T /F`; it never uses
-  a process-name or global kill.
+- On Windows, each app-owned shell and OpenCode process is assigned to a Job
+  Object with `KILL_ON_JOB_CLOSE`; closing the Job terminates its descendants.
+  The existing tracked-PID `taskkill /T /F` path remains the non-Job fallback;
+  neither path uses a process-name or global kill.
 - Release smoke verifies tracked OpenCode PID exit and terminal-child exit after
   close.
 
@@ -49,10 +51,26 @@ quality-tool caches are ignored and not tracked.
 `.github/workflows/ci.yml` runs frontend dependency install/build, Go test, Go
 vet, and the release build script with read-only repository permissions.
 
-## Pending Gates
+## Completed Gates
 
-- Full test, vet, frontend build, release build, and isolated smoke.
-- Manual review of fresh smoke screenshots.
-- SonarQube scan: blocked until its MCP integration, container runtime, and
-  credentials are available.
-- Brooks-Lint review-only health report.
+- `go test ./... -count=1`, `go vet ./cmd/... ./internal/... ./web`,
+  `npm.cmd --prefix web run build`, and `scripts/build.ps1` passed.
+- The isolated release smoke passed from outside the repository root with
+  embedded assets, 17 fresh screenshots, no Vite process, tracked OpenCode PID
+  exit, terminal-child exit, Settings modal, session refresh, and clean
+  Problems state.
+- All 17 source screenshots and their manifest were manually inspected. The
+  standalone Playwright image decoder intermittently showed partially painted
+  black regions; the in-app browser rendered the same release shell, Settings
+  modal, and running-terminal DOM geometry correctly. This is recorded as a
+  validation-capture limitation, not an app layout defect.
+- Brooks review-only audit found no dependency cycles or boundary violations.
+  Deferred non-blocking debt: duplicate local HTTP-origin/JSON helper logic in
+  several API packages; no broad refactor was made.
+
+## Remaining Gate
+
+- SonarQube scan is blocked: no runnable scanner or MCP integration, no
+  Docker/Podman runtime, and no configured project credentials. Do not accept
+  or tag v0.1.0 until this scan is completed or the user formally resolves the
+  gate.

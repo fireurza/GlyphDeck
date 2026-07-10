@@ -6,6 +6,8 @@ import (
 	"errors"
 	"os/exec"
 	"time"
+
+	"glyphdeck/internal/lifecycle"
 )
 
 // Server lifecycle states.
@@ -67,11 +69,12 @@ type StoppedServerInfo struct {
 
 // managedProcess holds the runtime state of a launched server.
 type managedProcess struct {
-	projectID string
-	cmd       *exec.Cmd
-	port      int
-	cancel    context.CancelFunc
-	startedAt time.Time
-	version   string
-	state     string
+	projectID   string
+	cmd         *exec.Cmd
+	processTree lifecycle.ProcessTree
+	port        int
+	cancel      context.CancelFunc
+	startedAt   time.Time
+	version     string
+	state       string
 }
