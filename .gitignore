@@ -39,6 +39,14 @@ Thumbs.db
 *.db
 *.db-wal
 *.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+
+# Local quality-tool artifacts
+.scannerwork/
+.sonarlint/
+.brooks-lint-history.json
 
 # Logs
 npm-debug.log*
