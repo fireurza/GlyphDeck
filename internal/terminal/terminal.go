@@ -2,7 +2,6 @@
 package terminal
 
 import (
-	"bufio"
 	"context"
 	"errors"
 	"fmt"
@@ -19,10 +18,8 @@ type Terminal struct {
 	ID          string
 	ProjectID   string
 	Cwd         string
-	cmd         *exec.Cmd
+	session     termSession
 	processTree lifecycle.ProcessTree
-	stdin       io.WriteCloser
-	stdout      io.ReadCloser
 	mu          sync.Mutex
 	closed      bool
 	createdAt   time.Time
@@ -98,27 +95,14 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 		return nil, fmt.Errorf("cwd does not exist: %w", err)
 	}
 
-	cmd := exec.Command(m.shellPath, m.shellArgs...)
-	cmd.Dir = cwd
-	cmd.Env = os.Environ()
-
-	stdin, err := cmd.StdinPipe()
+	session, err := newTermSession(m.shellPath, m.shellArgs, cwd)
 	if err != nil {
-		return nil, fmt.Errorf("create stdin pipe: %w", err)
-	}
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, fmt.Errorf("create stdout pipe: %w", err)
-	}
-	cmd.Stderr = cmd.Stdout // merge stderr into stdout
-
-	if err := cmd.Start(); err != nil {
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
-	processTree, err := lifecycle.AttachProcessTree(cmd.Process)
+	processTree, err := lifecycle.AttachProcessTree(session.process())
 	if err != nil {
-		_ = lifecycle.TerminateProcessTree(cmd.Process)
-		_ = cmd.Wait()
+		_ = session.close()
+		_ = session.wait()
 		return nil, fmt.Errorf("attach shell process tree: %w", err)
 	}
 
@@ -132,10 +116,8 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 		ID:          id,
 		ProjectID:   projectID,
 		Cwd:         cwd,
-		cmd:         cmd,
+		session:     session,
 		processTree: processTree,
-		stdin:       stdin,
-		stdout:      stdout,
 		createdAt:   time.Now(),
 	}
 
@@ -143,7 +125,7 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 
 	// Monitor process exit.
 	go func() {
-		_ = cmd.Wait()
+		_ = session.wait()
 		m.mu.Lock()
 		if t, ok := m.terminals[id]; ok {
 			t.closed = true
@@ -176,7 +158,10 @@ func (m *Manager) Write(id string, data []byte) error {
 		return fmt.Errorf("terminal %s is closed", id)
 	}
 
-	_, err := term.stdin.Write(data)
+	if term.session == nil {
+		return fmt.Errorf("terminal %s is closed", id)
+	}
+	_, err := term.session.stdin().Write(data)
 	return err
 }
 
@@ -188,13 +173,24 @@ func (m *Manager) NewReader(id string) (io.Reader, error) {
 	if !ok {
 		return nil, fmt.Errorf("terminal %s not found", id)
 	}
-	return term.stdout, nil
+	if term.session == nil {
+		return nil, fmt.Errorf("terminal %s is closed", id)
+	}
+	return term.session.stdout(), nil
 }
 
-// Resize changes the terminal window size (no-op for pipe-based terminals).
+// Resize changes the terminal window size.
 func (m *Manager) Resize(id string, rows, cols uint16) error {
-	// Pipe-based terminals don't support resize. Not an error — just a no-op.
-	return nil
+	m.mu.RLock()
+	term, ok := m.terminals[id]
+	m.mu.RUnlock()
+	if !ok {
+		return fmt.Errorf("terminal %s not found", id)
+	}
+	if term.session == nil {
+		return fmt.Errorf("terminal %s is closed", id)
+	}
+	return term.session.resize(rows, cols)
 }
 
 // Close terminates the terminal session.
@@ -208,15 +204,14 @@ func (m *Manager) Close(id string) error {
 	term.closed = true
 	m.mu.Unlock()
 
-	if term.stdin != nil {
-		_ = term.stdin.Close()
+	if term.session != nil {
+		_ = term.session.close()
 	}
-	var process *os.Process
-	if term.cmd != nil {
-		process = term.cmd.Process
-	}
-	if err := m.terminateProcessTree(term.processTree, process); err != nil {
+	if err := m.terminateProcessTree(term.processTree); err != nil {
 		return fmt.Errorf("terminate terminal %s: %w", id, err)
+	}
+	if term.session != nil {
+		_ = term.session.wait()
 	}
 
 	m.mu.Lock()
@@ -257,53 +252,24 @@ func (m *Manager) CloseAll() error {
 	var errs []error
 	for id, term := range m.terminals {
 		term.closed = true
-		if term.stdin != nil {
-			_ = term.stdin.Close()
+		if term.session != nil {
+			_ = term.session.close()
 		}
-		var process *os.Process
-		if term.cmd != nil {
-			process = term.cmd.Process
-		}
-		if err := m.terminateProcessTree(term.processTree, process); err != nil {
+		if err := m.terminateProcessTree(term.processTree); err != nil {
 			errs = append(errs, fmt.Errorf("terminate terminal %s: %w", id, err))
 			continue
+		}
+		if term.session != nil {
+			_ = term.session.wait()
 		}
 		delete(m.terminals, id)
 	}
 	return errors.Join(errs...)
 }
 
-func (m *Manager) terminateProcessTree(tree lifecycle.ProcessTree, process *os.Process) error {
+func (m *Manager) terminateProcessTree(tree lifecycle.ProcessTree) error {
 	if tree != nil {
 		return tree.Close()
 	}
-	if m.terminator != nil {
-		return m.terminator(process)
-	}
-	return lifecycle.TerminateProcessTree(process)
-}
-
-// copyWithContext copies from reader to writer until context is cancelled or reader closes.
-func copyWithContext(ctx context.Context, dst io.Writer, src io.Reader) error {
-	reader := bufio.NewReader(src)
-	buf := make([]byte, 4096)
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		default:
-		}
-		n, err := reader.Read(buf)
-		if n > 0 {
-			if _, writeErr := dst.Write(buf[:n]); writeErr != nil {
-				return writeErr
-			}
-		}
-		if err != nil {
-			if err == io.EOF {
-				return nil
-			}
-			return err
-		}
-	}
+	return nil
 }
