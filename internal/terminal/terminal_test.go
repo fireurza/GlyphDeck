@@ -1,34 +1,35 @@
 package terminal
 
 import (
-	"os"
-	"os/exec"
 	"testing"
 )
 
+type mockProcessTree struct {
+	closed int
+}
+
+func (m *mockProcessTree) Close() error {
+	m.closed++
+	return nil
+}
+
 func TestCloseTerminatesTrackedProcess(t *testing.T) {
-	terminated := 0
+	tree := &mockProcessTree{}
 	mgr := &Manager{
 		terminals: map[string]*Terminal{
 			"term-1": {
-				ID:  "term-1",
-				cmd: &exec.Cmd{Process: &os.Process{Pid: 4321}},
+				ID:          "term-1",
+				processTree: tree,
 			},
 		},
-		terminator: func(process *os.Process) error {
-			terminated++
-			if process.Pid != 4321 {
-				t.Fatalf("process PID = %d, want 4321", process.Pid)
-			}
-			return nil
-		},
+		terminator: nil,
 	}
 
 	if err := mgr.Close("term-1"); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	if terminated != 1 {
-		t.Fatalf("termination calls = %d, want 1", terminated)
+	if tree.closed != 1 {
+		t.Fatalf("processTree.Close() calls = %d, want 1", tree.closed)
 	}
 	if status, err := mgr.Status("term-1"); err != nil || status.Running {
 		t.Fatalf("Status() = %#v, %v; want closed terminal", status, err)
@@ -36,22 +37,23 @@ func TestCloseTerminatesTrackedProcess(t *testing.T) {
 }
 
 func TestCloseAllTerminatesEveryTrackedProcess(t *testing.T) {
-	terminated := 0
+	tree1 := &mockProcessTree{}
+	tree2 := &mockProcessTree{}
 	mgr := &Manager{
 		terminals: map[string]*Terminal{
-			"term-1": {ID: "term-1", cmd: &exec.Cmd{Process: &os.Process{Pid: 1}}},
-			"term-2": {ID: "term-2", cmd: &exec.Cmd{Process: &os.Process{Pid: 2}}},
+			"term-1": {ID: "term-1", processTree: tree1},
+			"term-2": {ID: "term-2", processTree: tree2},
 		},
-		terminator: func(*os.Process) error {
-			terminated++
-			return nil
-		},
+		terminator: nil,
 	}
 
 	if err := mgr.CloseAll(); err != nil {
 		t.Fatalf("CloseAll() error = %v", err)
 	}
-	if terminated != 2 {
-		t.Fatalf("termination calls = %d, want 2", terminated)
+	if tree1.closed != 1 {
+		t.Fatalf("tree1.Close() calls = %d, want 1", tree1.closed)
+	}
+	if tree2.closed != 1 {
+		t.Fatalf("tree2.Close() calls = %d, want 1", tree2.closed)
 	}
 }
