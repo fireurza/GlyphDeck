@@ -23,15 +23,16 @@ GlyphDeck is a local-first web workspace for managing projects, detecting OpenCo
 | M13 | SQLite-backed Settings and release build plumbing | Accepted |
 | M14 | Reliable terminal SSE marker streaming | Accepted |
 
-## v0.1.0 Release Candidate
+## v0.1.0 Release
 
 See [docs/agent/MVP_V0_1_0_PLAN.md](docs/agent/MVP_V0_1_0_PLAN.md) for the full MVP plan.
 
-The accepted release candidate (`6778e4a`) serves the React build from `glyphdeck.exe`, uses SQLite for
-projects and Settings, and has a fresh isolated MVP smoke suite. Settings is
-opened from the activity rail as a modal overlay; the bottom dock contains only
-Problems, Agent Terminal, and Terminal. Tagging and release notes remain a
-separate release action.
+The accepted MVP release candidate (`6778e4a`) serves the React build from
+`glyphdeck.exe`, uses SQLite for projects and Settings, and has a fresh
+isolated MVP smoke suite. Settings opens from the activity rail as a modal
+overlay; the bottom dock contains only Problems, Agent Terminal, and Terminal.
+See [v0.1.0 release notes](docs/RELEASE_NOTES.md) for functionality,
+validation coverage, and known limitations.
 
 ## Prerequisites
 
