@@ -23,6 +23,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -93,7 +94,11 @@ func main() {
 	terminalProjectAdapter := &terminalProjectResolverAdapter{registry: registry}
 	terminalMgr := terminal.NewManager(terminalProjectAdapter)
 	terminal.RegisterHandlers(mux, terminalMgr)
-	defer terminalMgr.CloseAll()
+	defer func() {
+		if err := terminalMgr.CloseAll(); err != nil {
+			log.Printf("shutdown: error closing terminals: %v", err)
+		}
+	}()
 
 	// Problems.
 	problemsMgr := problems.NewManager(100)
@@ -116,7 +121,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      mux,
+		Handler:      localMutationGuard(mux),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -149,8 +154,11 @@ func main() {
 	}
 
 	// Stop all app-owned terminals.
-	terminalMgr.CloseAll()
-	log.Println("shutdown: terminals closed")
+	if err := terminalMgr.CloseAll(); err != nil {
+		log.Printf("shutdown: error closing terminals: %v", err)
+	} else {
+		log.Println("shutdown: terminals closed")
+	}
 
 	// Stop event hub bridges.
 	eventsHub.StopAll()
@@ -181,6 +189,60 @@ func isLoopbackHost(host string) bool {
 	}
 	ip := net.ParseIP(host)
 	return ip != nil && ip.IsLoopback()
+}
+
+// localMutationGuard blocks cross-origin and non-loopback mutation requests.
+func localMutationGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isMutationMethod(r.Method) && !isAllowedLocalMutation(r) {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusForbidden)
+			_ = json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]string{
+					"code":    "forbidden_origin",
+					"message": "Mutation requests must use a loopback origin.",
+				},
+			})
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func isMutationMethod(method string) bool {
+	switch method {
+	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
+		return true
+	default:
+		return false
+	}
+}
+
+func isAllowedLocalMutation(r *http.Request) bool {
+	if !isLoopbackHost(requestHostname(r.Host)) {
+		return false
+	}
+
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true
+	}
+	parsed, err := url.Parse(origin)
+	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
+		return false
+	}
+	return isLoopbackHost(requestHostname(parsed.Host))
+}
+
+func requestHostname(hostPort string) string {
+	host, _, err := net.SplitHostPort(hostPort)
+	if err != nil {
+		host = hostPort
+	}
+	host = strings.TrimSpace(host)
+	host = strings.TrimPrefix(host, "[")
+	host = strings.TrimSuffix(host, "]")
+	return strings.ToLower(host)
 }
 
 // projectResolverAdapter adapts the projects.Registry to servers.ProjectResolver.

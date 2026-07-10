@@ -27,6 +27,7 @@ const checks = [];
 let page;
 let browser;
 let validationTerminalID;
+let appOwnedServerPID;
 
 function recordCheck(label) {
   checks.push({ label, status: 'PASS' });
@@ -36,6 +37,15 @@ function recordCheck(label) {
 function fail(message) {
   checks.push({ label: message, status: 'FAIL' });
   throw new Error(message);
+}
+
+function isProcessAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    return error?.code === 'EPERM';
+  }
 }
 
 async function apiGet(route) {
@@ -233,8 +243,13 @@ async function run() {
   await page.getByTestId('project-start-server-button').click();
   await waitUntil(async () => {
     const server = await apiGet(`/api/projects/${encodeURIComponent(project.id)}/server`);
+    if (server.status === 'ready' && Number.isInteger(server.pid) && server.pid > 0) {
+      appOwnedServerPID = server.pid;
+    }
     return server.status === 'ready';
   }, 'app-owned OpenCode server reached ready state', 60000);
+  if (!appOwnedServerPID) fail('app-owned OpenCode server did not report a tracked PID');
+  recordCheck('app-owned OpenCode server PID tracked');
   await requireVisible('server-status', 'ready server status visible');
   await screenshot('04-server-ready.png', 'OpenCode server ready');
 
@@ -316,6 +331,21 @@ async function run() {
   ), 'terminal marker output visible', 15000);
   await screenshot('12-terminal-marker-visible.png', 'Terminal marker output visible');
 
+  const childMarker = `GLYPHDECK_MVP_CHILD_${RUN_ID.toUpperCase()}`;
+  const childCommand = `$p = Start-Process -FilePath node.exe -ArgumentList @('-e', 'setInterval(() => {}, 1000)') -PassThru; Write-Output '${childMarker}=' + $p.Id`;
+  await page.getByTestId('user-terminal-input').fill(childCommand);
+  await page.getByTestId('user-terminal-input').press('Enter');
+  await waitUntil(async () => (
+    ((await page.getByTestId('user-terminal-output').textContent()) || '').includes(childMarker)
+  ), 'terminal child process started', 15000);
+  const terminalOutput = (await page.getByTestId('user-terminal-output').textContent()) || '';
+  const childPIDMatch = terminalOutput.match(new RegExp(`${childMarker}=(\\d+)`));
+  const childPID = Number(childPIDMatch?.[1]);
+  if (!Number.isInteger(childPID) || childPID <= 0) {
+    fail('terminal child process did not report a valid PID');
+  }
+  recordCheck('terminal child process PID tracked');
+
   await page.getByTestId('user-terminal-close-button').click();
   await waitUntil(async () => (
     ((await page.getByTestId('user-terminal-status').textContent()) || '').includes('Closed')
@@ -324,6 +354,7 @@ async function run() {
   if (closedTerminal.running) {
     fail('validation terminal remains running after UI close');
   }
+  await waitUntil(() => !isProcessAlive(childPID), 'terminal child process stopped with terminal tree', 10000);
   recordCheck('validation terminal cleanup confirmed through API');
   validationTerminalID = undefined;
   await screenshot('13-terminal-closed.png', 'Terminal closed state');
@@ -362,6 +393,7 @@ async function run() {
   if (offlineTitle !== 'Event stream: Offline') {
     fail(`event stream state after stop is ${JSON.stringify(offlineTitle)}, want Offline`);
   }
+  await waitUntil(() => !isProcessAlive(appOwnedServerPID), 'app-owned OpenCode server PID stopped', 10000);
   recordCheck('server stop leaves a sane offline state');
   await requireNoErrorStates('post-stop state');
   await screenshot('16-post-stop.png', 'Server stopped and event stream offline');
