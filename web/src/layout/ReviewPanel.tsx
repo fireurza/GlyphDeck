@@ -59,6 +59,8 @@ function ReviewPanel({ selectedProjectId, selectedSessionId }: ReviewPanelProps)
     )
   }
 
+  const changedFiles = Array.isArray(data?.git.changedFiles) ? data.git.changedFiles : []
+
   return (
     <div className="review-panel" data-testid="review-panel">
       <div className="review-panel__toolbar">
@@ -130,12 +132,12 @@ function ReviewPanel({ selectedProjectId, selectedSessionId }: ReviewPanelProps)
                       {data.git.dirty ? 'Dirty' : 'Clean'}
                     </dd>
                   </div>
-                  {data.git.changedFiles.length > 0 && (
+                  {changedFiles.length > 0 && (
                     <div className="review-stat">
                       <dt>Changed Files</dt>
                       <dd data-testid="review-changed-files">
                         <ul className="review-file-list">
-                          {data.git.changedFiles.map((f, i) => (
+                          {changedFiles.map((f, i) => (
                             <li key={i}>{f}</li>
                           ))}
                         </ul>

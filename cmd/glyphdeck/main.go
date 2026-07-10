@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"glyphdeck/internal/devtools"
 	"glyphdeck/internal/events"
+	"glyphdeck/internal/httpapi"
 	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/permissions"
 	"glyphdeck/internal/problems"
@@ -23,7 +24,6 @@ import (
 	"log"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"os/signal"
 	"strings"
@@ -34,7 +34,7 @@ import (
 func main() {
 	host := getEnv("GLYPHDECK_HOST", "127.0.0.1")
 	port := getEnv("GLYPHDECK_PORT", "8756")
-	if !isLoopbackHost(host) {
+	if !httpapi.IsLoopbackHost(host) {
 		log.Fatalf("server host must be loopback-only; set GLYPHDECK_HOST to 127.0.0.1 or localhost")
 	}
 	addr := net.JoinHostPort(host, port)
@@ -183,66 +183,15 @@ func getEnv(key, fallback string) string {
 	return fallback
 }
 
-func isLoopbackHost(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
-}
-
 // localMutationGuard blocks cross-origin and non-loopback mutation requests.
 func localMutationGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if isMutationMethod(r.Method) && !isAllowedLocalMutation(r) {
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusForbidden)
-			_ = json.NewEncoder(w).Encode(map[string]any{
-				"error": map[string]string{
-					"code":    "forbidden_origin",
-					"message": "Mutation requests must use a loopback origin.",
-				},
-			})
+		if httpapi.IsMutationMethod(r.Method) && !httpapi.AllowLocalMutation(r) {
+			httpapi.WriteError(w, http.StatusForbidden, "forbidden_origin", "Mutation requests must use the same local origin.")
 			return
 		}
 		next.ServeHTTP(w, r)
 	})
-}
-
-func isMutationMethod(method string) bool {
-	switch method {
-	case http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete:
-		return true
-	default:
-		return false
-	}
-}
-
-func isAllowedLocalMutation(r *http.Request) bool {
-	if !isLoopbackHost(requestHostname(r.Host)) {
-		return false
-	}
-
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Scheme != "http" || parsed.Host == "" {
-		return false
-	}
-	return isLoopbackHost(requestHostname(parsed.Host))
-}
-
-func requestHostname(hostPort string) string {
-	host, _, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		host = hostPort
-	}
-	host = strings.TrimSpace(host)
-	host = strings.TrimPrefix(host, "[")
-	host = strings.TrimSuffix(host, "]")
-	return strings.ToLower(host)
 }
 
 // projectResolverAdapter adapts the projects.Registry to servers.ProjectResolver.

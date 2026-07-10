@@ -2,15 +2,16 @@
 
 ## Status
 
-In progress. The local `v0.1.0` tag was removed before this audit. Do not create
-a new tag until every gate in this document passes.
+In progress. The local `v0.1.0` tag was removed before this audit. The
+hardening branch gates passed locally, but do not create a new tag until the
+user authorizes final v0.1.0 release acceptance.
 
 ## Release Boundary
 
 - GlyphDeck defaults to `127.0.0.1` and rejects non-loopback bind values.
-- Mutating HTTP requests require a loopback host and, when supplied, a loopback
-  `Origin`. This covers terminal, Settings, permission, server, project, and
-  session mutations.
+- Mutating HTTP requests require a loopback host and an exact same-origin
+  `Origin` host+port. Different loopback ports are rejected in release mode.
+  Vite/dev cross-origin is allowed only with `GLYPHDECK_DEV_TOOLS=1`.
 - GlyphDeck has no user authentication. The loopback-only boundary is not a
   substitute for authentication and must not be exposed to another network.
 
@@ -48,29 +49,50 @@ quality-tool caches are ignored and not tracked.
 
 ## CI Baseline
 
-`.github/workflows/ci.yml` runs frontend dependency install/build, Go test, Go
-vet, and the release build script with read-only repository permissions.
+`.github/workflows/ci.yml` runs frontend dependency install, frontend tests,
+frontend build, Go test, Go vet, and the release build script with read-only
+repository permissions.
 
 ## Completed Gates
 
 - `go test ./... -count=1`, `go vet ./cmd/... ./internal/... ./web`,
-  `npm.cmd --prefix web run build`, and `scripts/build.ps1` passed.
+  `npm.cmd --prefix web run test`, `npm.cmd --prefix web run build`, and
+  `scripts/build.ps1` passed.
 - The isolated release smoke passed from outside the repository root with
   embedded assets, 17 fresh screenshots, no Vite process, tracked OpenCode PID
   exit, terminal-child exit, Settings modal, session refresh, and clean
   Problems state.
-- All 17 source screenshots and their manifest were manually inspected. The
-  standalone Playwright image decoder intermittently showed partially painted
-  black regions; the in-app browser rendered the same release shell, Settings
-  modal, and running-terminal DOM geometry correctly. This is recorded as a
-  validation-capture limitation, not an app layout defect.
-- Brooks review-only audit found no dependency cycles or boundary violations.
-  Deferred non-blocking debt: duplicate local HTTP-origin/JSON helper logic in
-  several API packages; no broad refactor was made.
+- All 17 source screenshots plus `contact-sheet.png` were manually inspected.
+  No layout, modal, panel, terminal, or Problems visual blocker was found.
+- Repo hygiene passed: `git ls-files` showed no tracked DBs, logs,
+  screenshots, `dist`, `node_modules`, `.glyphdeck`, or secrets.
+- `npm.cmd --prefix web audit --audit-level=high` passed with 0
+  vulnerabilities. `govulncheck`, `staticcheck`, and `actionlint` were not
+  installed locally, so they were not run.
+- Brooks Review / Brooks Health branch review found the prior critical
+  loopback-origin finding fixed and no remaining critical or warning findings
+  in the branch diff. Health result: release-clean for this correction branch.
 
-## Remaining Gate
+## Fixed Brooks Findings
 
-- SonarQube scan is blocked: no runnable scanner or MCP integration, no
-  Docker/Podman runtime, and no configured project credentials. Do not accept
-  or tag v0.1.0 until this scan is completed or the user formally resolves the
-  gate.
+- Critical — loopback origin becomes global trust rule: fixed by requiring exact
+  same-origin host+port for mutations in release mode and gating Vite/dev
+  cross-origin behind `GLYPHDECK_DEV_TOOLS=1`.
+- Warning — frontend has no unit/component tests: fixed with a Vitest baseline
+  covering Settings modal lifecycle, Settings save success, API client errors,
+  and Review null-file-list resilience.
+- Warning — duplicated HTTP security/response helpers: fixed with
+  `internal/httpapi` for JSON responses, errors, content type checks, mutation
+  method checks, and local-origin guard logic.
+- Warning — SSE tests use fixed sleeps: fixed by replacing sleeps with
+  condition/event waits and bounded deadlines.
+- Suggestion — OpenCode command built twice: fixed by building the command once
+  after creating the child context.
+
+## Remaining Release Limitations
+
+- localhost-only / no auth remains the v0.1.0 security boundary.
+- Windows terminal remains pipe-based rather than true PTY.
+- App-owned servers and terminals stop at backend shutdown.
+- Sessions come from the running OpenCode server; GlyphDeck restores selection
+  only.
