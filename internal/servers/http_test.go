@@ -2,6 +2,7 @@ package servers
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -21,9 +22,29 @@ func setupTestServer(t *testing.T, detector opencode.Detector, resolver ProjectR
 	return httptest.NewServer(mux)
 }
 
-func readErrorResponse(t *testing.T, body []byte) errorResponse {
+func postSameOrigin(t *testing.T, ts *httptest.Server, path, contentType string, body io.Reader) (*http.Response, error) {
 	t.Helper()
-	var er errorResponse
+	req, err := http.NewRequest(http.MethodPost, ts.URL+path, body)
+	if err != nil {
+		t.Fatalf("create POST request: %v", err)
+	}
+	req.Header.Set("Origin", ts.URL)
+	if contentType != "" {
+		req.Header.Set("Content-Type", contentType)
+	}
+	return ts.Client().Do(req)
+}
+
+type testErrorResponse struct {
+	Error struct {
+		Code    string `json:"code"`
+		Message string `json:"message"`
+	} `json:"error"`
+}
+
+func readErrorResponse(t *testing.T, body []byte) testErrorResponse {
+	t.Helper()
+	var er testErrorResponse
 	if err := json.Unmarshal(body, &er); err != nil {
 		t.Fatalf("unmarshal error response: %v\nbody: %s", err, body)
 	}
@@ -154,8 +175,7 @@ func TestHandleServerStart_NotInstalled(t *testing.T) {
 	ts := setupTestServer(t, detector, resolver)
 	defer ts.Close()
 
-	// POST without Origin header — same-origin check passes.
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/server/start", "application/json", nil)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/server/start", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST start: %v", err)
 	}
@@ -172,7 +192,7 @@ func TestHandleServerStart_ProjectNotFound(t *testing.T) {
 	ts := setupTestServer(t, detector, resolver)
 	defer ts.Close()
 
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/nonexistent/server/start", "application/json", nil)
+	resp, err := postSameOrigin(t, ts, "/api/projects/nonexistent/server/start", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST start: %v", err)
 	}
@@ -214,7 +234,7 @@ func TestHandleServerStop_NotRunning(t *testing.T) {
 	ts := setupTestServer(t, detector, resolver)
 	defer ts.Close()
 
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/server/stop", "application/json", nil)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/server/stop", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST stop: %v", err)
 	}
@@ -257,7 +277,7 @@ func TestHandleServerStart_JSONResponseShape(t *testing.T) {
 	ts := setupTestServer(t, detector, resolver)
 	defer ts.Close()
 
-	resp, err := ts.Client().Post(ts.URL+"/api/projects/proj-1/server/start", "application/json", nil)
+	resp, err := postSameOrigin(t, ts, "/api/projects/proj-1/server/start", "application/json", nil)
 	if err != nil {
 		t.Fatalf("POST start: %v", err)
 	}

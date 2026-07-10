@@ -135,18 +135,12 @@ func (m *ServerManager) Start(ctx context.Context, projectID string) (ServerStat
 		return ServerStatus{}, fmt.Errorf("allocate port: %w", err)
 	}
 
-	// 5. Build the command.
+	// 5. Create child context with cancel for lifecycle management.
 	openCodePath := detection.Executable
-	cmd := exec.CommandContext(ctx, openCodePath, "serve", "--port", strconv.Itoa(port), "--hostname", "127.0.0.1")
-	cmd.Dir = project.Path
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	// 6. Create child context with cancel for lifecycle management.
 	childCtx, cancel := context.WithCancel(context.Background())
 
-	// Replace the command's context with our child context so we control cancellation.
-	cmd = exec.CommandContext(childCtx, openCodePath, "serve", "--port", strconv.Itoa(port), "--hostname", "127.0.0.1")
+	// 6. Build the command with the owned child context.
+	cmd := exec.CommandContext(childCtx, openCodePath, "serve", "--port", strconv.Itoa(port), "--hostname", "127.0.0.1")
 	cmd.Dir = project.Path
 	cmd.Env = os.Environ()
 	cmd.Stdout = os.Stdout

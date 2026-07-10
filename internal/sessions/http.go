@@ -3,10 +3,8 @@ package sessions
 import (
 	"encoding/json"
 	"errors"
-	"mime"
-	"net"
+	"glyphdeck/internal/httpapi"
 	"net/http"
-	"net/url"
 	"strings"
 )
 
@@ -46,16 +44,16 @@ func (h sessionHandler) listSessions(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"sessions": sessions})
 }
 
 func (h sessionHandler) createSession(w http.ResponseWriter, r *http.Request) {
-	if !sameOriginMutation(r) {
-		writeError(w, http.StatusForbidden, "forbidden_origin", "Session mutations must come from the same origin.")
+	if !httpapi.SameOriginMutation(r) {
+		httpapi.WriteError(w, http.StatusForbidden, "forbidden_origin", "Session mutations must come from the same origin.")
 		return
 	}
-	if !hasJSONContentType(r) {
-		writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json.")
+	if !httpapi.HasJSONContentType(r) {
+		httpapi.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json.")
 		return
 	}
 
@@ -68,7 +66,7 @@ func (h sessionHandler) createSession(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid session JSON.")
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid session JSON.")
 		return
 	}
 
@@ -81,7 +79,7 @@ func (h sessionHandler) createSession(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, session)
+	httpapi.WriteJSON(w, http.StatusCreated, session)
 }
 
 func (h sessionHandler) getSession(w http.ResponseWriter, r *http.Request) {
@@ -93,7 +91,7 @@ func (h sessionHandler) getSession(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, session)
+	httpapi.WriteJSON(w, http.StatusOK, session)
 }
 
 func (h sessionHandler) listMessages(w http.ResponseWriter, r *http.Request) {
@@ -105,16 +103,16 @@ func (h sessionHandler) listMessages(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"messages": messages})
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{"messages": messages})
 }
 
 func (h sessionHandler) sendPrompt(w http.ResponseWriter, r *http.Request) {
-	if !sameOriginMutation(r) {
-		writeError(w, http.StatusForbidden, "forbidden_origin", "Prompt mutations must come from the same origin.")
+	if !httpapi.SameOriginMutation(r) {
+		httpapi.WriteError(w, http.StatusForbidden, "forbidden_origin", "Prompt mutations must come from the same origin.")
 		return
 	}
-	if !hasJSONContentType(r) {
-		writeError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json.")
+	if !httpapi.HasJSONContentType(r) {
+		httpapi.WriteError(w, http.StatusUnsupportedMediaType, "unsupported_media_type", "Content-Type must be application/json.")
 		return
 	}
 
@@ -128,12 +126,12 @@ func (h sessionHandler) sendPrompt(w http.ResponseWriter, r *http.Request) {
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
 	if err := decoder.Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid prompt JSON.")
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid prompt JSON.")
 		return
 	}
 
 	if req.Text == "" {
-		writeError(w, http.StatusBadRequest, "missing_text", "Prompt text is required.")
+		httpapi.WriteError(w, http.StatusBadRequest, "missing_text", "Prompt text is required.")
 		return
 	}
 
@@ -142,7 +140,7 @@ func (h sessionHandler) sendPrompt(w http.ResponseWriter, r *http.Request) {
 		writeSessionError(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, result)
+	httpapi.WriteJSON(w, http.StatusOK, result)
 }
 
 // ---------------------------------------------------------------------------
@@ -156,15 +154,15 @@ func writeSessionError(w http.ResponseWriter, err error) {
 	msg := err.Error()
 	switch {
 	case errors.Is(err, ErrProjectNotFound):
-		writeError(w, http.StatusNotFound, "project_not_found", "Project was not found.")
+		httpapi.WriteError(w, http.StatusNotFound, "project_not_found", "Project was not found.")
 	case errors.Is(err, ErrServerNotReady):
-		writeError(w, http.StatusConflict, "server_not_ready", "Server is not ready for this project.")
+		httpapi.WriteError(w, http.StatusConflict, "server_not_ready", "Server is not ready for this project.")
 	case strings.Contains(msg, "server not ready"):
-		writeError(w, http.StatusConflict, "server_not_ready", "Server is not ready for this project.")
+		httpapi.WriteError(w, http.StatusConflict, "server_not_ready", "Server is not ready for this project.")
 	case strings.Contains(msg, "opencode:"):
-		writeError(w, http.StatusBadGateway, "opencode_error", "OpenCode server returned an error.")
+		httpapi.WriteError(w, http.StatusBadGateway, "opencode_error", "OpenCode server returned an error.")
 	default:
-		writeError(w, http.StatusInternalServerError, "internal_error", "Session operation failed.")
+		httpapi.WriteError(w, http.StatusInternalServerError, "internal_error", "Session operation failed.")
 	}
 }
 
@@ -176,69 +174,3 @@ var (
 	ErrProjectNotFound = errors.New("project not found")
 	ErrServerNotReady  = errors.New("server not ready")
 )
-
-// ---------------------------------------------------------------------------
-// HTTP helpers (shared pattern with projects and servers packages)
-// ---------------------------------------------------------------------------
-
-type apiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-type errorResponse struct {
-	Error apiError `json:"error"`
-}
-
-func hasJSONContentType(r *http.Request) bool {
-	contentType := r.Header.Get("Content-Type")
-	if contentType == "" {
-		return false
-	}
-	mediaType, _, err := mime.ParseMediaType(contentType)
-	return err == nil && mediaType == "application/json"
-}
-
-func sameOriginMutation(r *http.Request) bool {
-	origin := r.Header.Get("Origin")
-	if origin == "" {
-		return true
-	}
-	parsed, err := url.Parse(origin)
-	if err != nil || parsed.Host == "" {
-		return false
-	}
-	if parsed.Host == r.Host {
-		return true
-	}
-	return isLoopbackHost(hostname(parsed.Host)) && isLoopbackHost(hostname(r.Host))
-}
-
-func hostname(hostPort string) string {
-	host, _, err := net.SplitHostPort(hostPort)
-	if err != nil {
-		host = hostPort
-	}
-	host = strings.TrimSpace(host)
-	host = strings.TrimPrefix(host, "[")
-	host = strings.TrimSuffix(host, "]")
-	return strings.ToLower(host)
-}
-
-func isLoopbackHost(host string) bool {
-	if host == "localhost" {
-		return true
-	}
-	ip := net.ParseIP(host)
-	return ip != nil && ip.IsLoopback()
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, errorResponse{Error: apiError{Code: code, Message: message}})
-}
