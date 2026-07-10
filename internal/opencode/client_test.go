@@ -205,29 +205,34 @@ func TestClient_SendPrompt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendPrompt: %v", err)
 	}
-	if result.Role != "assistant" {
-		t.Fatalf("Role = %q, want assistant", result.Role)
-	}
-	if result.MessageID == "" {
-		t.Fatal("MessageID is empty")
-	}
-	if result.Text == "" {
-		t.Fatal("Text is empty")
-	}
 
-	// Verify auth header was sent.
-	if h.lastAuth == "" {
-		t.Error("Authorization header was not sent")
-	}
+	t.Run("response fields", func(t *testing.T) {
+		if result.Role != "assistant" {
+			t.Fatalf("Role = %q, want assistant", result.Role)
+		}
+		if result.MessageID == "" {
+			t.Fatal("MessageID is empty")
+		}
+		if result.Text == "" {
+			t.Fatal("Text is empty")
+		}
+	})
 
-	// After sending, ListMessages should return 2 messages.
-	msgs, err := client.ListMessages(context.Background(), session.ID)
-	if err != nil {
-		t.Fatalf("ListMessages: %v", err)
-	}
-	if len(msgs) != 2 {
-		t.Fatalf("len(msgs) = %d, want 2", len(msgs))
-	}
+	t.Run("sends auth header", func(t *testing.T) {
+		if h.lastAuth == "" {
+			t.Error("Authorization header was not sent")
+		}
+	})
+
+	t.Run("message history grows", func(t *testing.T) {
+		msgs, err := client.ListMessages(context.Background(), session.ID)
+		if err != nil {
+			t.Fatalf("ListMessages: %v", err)
+		}
+		if len(msgs) != 2 {
+			t.Fatalf("len(msgs) = %d, want 2", len(msgs))
+		}
+	})
 }
 
 func TestClient_AuthHeader(t *testing.T) {
