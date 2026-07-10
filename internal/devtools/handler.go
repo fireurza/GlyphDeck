@@ -3,7 +3,7 @@ package devtools
 
 import (
 	"context"
-	"encoding/json"
+	"glyphdeck/internal/httpapi"
 	"net/http"
 	"os"
 
@@ -63,7 +63,7 @@ type projectState struct {
 func (h *handler) state(w http.ResponseWriter, r *http.Request) {
 	list, err := h.registry.List(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "registry_error", "Failed to list projects.")
+		httpapi.WriteError(w, http.StatusInternalServerError, "registry_error", "Failed to list projects.")
 		return
 	}
 
@@ -80,7 +80,7 @@ func (h *handler) state(w http.ResponseWriter, r *http.Request) {
 		items = append(items, ps)
 	}
 
-	writeJSON(w, http.StatusOK, stateResponse{Projects: items, Count: len(items)})
+	httpapi.WriteJSON(w, http.StatusOK, stateResponse{Projects: items, Count: len(items)})
 }
 
 // POST /api/dev/reset-validation-state — removes all projects from the registry.
@@ -88,7 +88,7 @@ func (h *handler) state(w http.ResponseWriter, r *http.Request) {
 func (h *handler) resetState(w http.ResponseWriter, r *http.Request) {
 	list, err := h.registry.List(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "registry_error", "Failed to list projects.")
+		httpapi.WriteError(w, http.StatusInternalServerError, "registry_error", "Failed to list projects.")
 		return
 	}
 
@@ -100,7 +100,7 @@ func (h *handler) resetState(w http.ResponseWriter, r *http.Request) {
 		removed++
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 		"removed": removed,
 		"total":   len(list),
 	})
@@ -111,34 +111,11 @@ func (h *handler) resetState(w http.ResponseWriter, r *http.Request) {
 func (h *handler) stopAllServers(w http.ResponseWriter, r *http.Request) {
 	stopped, err := h.servers.StopAllAppOwned(r.Context())
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "stop_error", "Failed to stop servers.")
+		httpapi.WriteError(w, http.StatusInternalServerError, "stop_error", "Failed to stop servers.")
 		return
 	}
 
-	writeJSON(w, http.StatusOK, map[string]any{
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
 		"stopped": stopped,
 	})
-}
-
-// ---------------------------------------------------------------------------
-// Helpers (mirrors internal/projects/http.go pattern)
-// ---------------------------------------------------------------------------
-
-type errorResponse struct {
-	Error apiError `json:"error"`
-}
-
-type apiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, errorResponse{Error: apiError{Code: code, Message: message}})
 }

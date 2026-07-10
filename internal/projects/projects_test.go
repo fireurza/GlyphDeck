@@ -3,6 +3,7 @@ package projects
 import (
 	"context"
 	"errors"
+	"glyphdeck/internal/httpapi"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -269,10 +270,10 @@ func TestSameOriginMutation(t *testing.T) {
 			want:   true,
 		},
 		{
-			name:   "vite loopback proxy",
+			name:   "different loopback port rejected",
 			host:   "127.0.0.1:8756",
 			origin: "http://127.0.0.1:5173",
-			want:   true,
+			want:   false,
 		},
 		{
 			name:   "external origin",
@@ -290,9 +291,9 @@ func TestSameOriginMutation(t *testing.T) {
 				req.Header.Set("Origin", tt.origin)
 			}
 
-			got := sameOriginMutation(req)
+			got := httpapi.SameOriginMutation(req)
 			if got != tt.want {
-				t.Fatalf("sameOriginMutation() = %v, want %v", got, tt.want)
+				t.Fatalf("httpapi.SameOriginMutation() = %v, want %v", got, tt.want)
 			}
 		})
 	}

@@ -3,6 +3,7 @@ package terminal
 import (
 	"encoding/json"
 	"fmt"
+	"glyphdeck/internal/httpapi"
 	"io"
 	"log"
 	"net/http"
@@ -42,10 +43,10 @@ func (h *Handler) startTerminal(w http.ResponseWriter, r *http.Request) {
 	status, err := h.manager.Start(r.Context(), projectID, req.Cwd)
 	if err != nil {
 		log.Printf("terminal start error for project %s: %v", projectID, err)
-		writeError(w, http.StatusInternalServerError, "terminal_error", err.Error())
+		httpapi.WriteError(w, http.StatusInternalServerError, "terminal_error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusCreated, status)
+	httpapi.WriteJSON(w, http.StatusCreated, status)
 }
 
 // streamTerminal streams terminal output via SSE.
@@ -54,13 +55,13 @@ func (h *Handler) streamTerminal(w http.ResponseWriter, r *http.Request) {
 
 	status, err := h.manager.Status(terminalID)
 	if err != nil || !status.Running {
-		writeError(w, http.StatusNotFound, "terminal_not_found", "Terminal not found or not running.")
+		httpapi.WriteError(w, http.StatusNotFound, "terminal_not_found", "Terminal not found or not running.")
 		return
 	}
 
 	flusher, ok := w.(http.Flusher)
 	if !ok {
-		writeError(w, http.StatusInternalServerError, "streaming_unsupported", "Streaming not supported.")
+		httpapi.WriteError(w, http.StatusInternalServerError, "streaming_unsupported", "Streaming not supported.")
 		return
 	}
 
@@ -164,12 +165,12 @@ func (h *Handler) writeTerminal(w http.ResponseWriter, r *http.Request) {
 		Input string `json:"input"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid JSON.")
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid JSON.")
 		return
 	}
 
 	if err := h.manager.Write(terminalID, []byte(req.Input)); err != nil {
-		writeError(w, http.StatusInternalServerError, "terminal_error", err.Error())
+		httpapi.WriteError(w, http.StatusInternalServerError, "terminal_error", err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -184,12 +185,12 @@ func (h *Handler) resizeTerminal(w http.ResponseWriter, r *http.Request) {
 		Cols uint16 `json:"cols"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		writeError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid JSON.")
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid JSON.")
 		return
 	}
 
 	if err := h.manager.Resize(terminalID, req.Rows, req.Cols); err != nil {
-		writeError(w, http.StatusInternalServerError, "terminal_error", err.Error())
+		httpapi.WriteError(w, http.StatusInternalServerError, "terminal_error", err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -199,7 +200,7 @@ func (h *Handler) resizeTerminal(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) closeTerminal(w http.ResponseWriter, r *http.Request) {
 	terminalID := r.PathValue("terminalId")
 	if err := h.manager.Close(terminalID); err != nil {
-		writeError(w, http.StatusInternalServerError, "terminal_error", err.Error())
+		httpapi.WriteError(w, http.StatusInternalServerError, "terminal_error", err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -210,10 +211,10 @@ func (h *Handler) statusTerminal(w http.ResponseWriter, r *http.Request) {
 	terminalID := r.PathValue("terminalId")
 	status, err := h.manager.Status(terminalID)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "terminal_error", err.Error())
+		httpapi.WriteError(w, http.StatusInternalServerError, "terminal_error", err.Error())
 		return
 	}
-	writeJSON(w, http.StatusOK, status)
+	httpapi.WriteJSON(w, http.StatusOK, status)
 }
 
 // escapeSSE replaces newlines with SSE-safe data lines.
@@ -233,27 +234,4 @@ func escapeSSE(data []byte) string {
 		}
 	}
 	return result
-}
-
-// ---------------------------------------------------------------------------
-// HTTP helpers
-// ---------------------------------------------------------------------------
-
-type apiError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-}
-
-type errorResponse struct {
-	Error apiError `json:"error"`
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
-}
-
-func writeError(w http.ResponseWriter, status int, code, message string) {
-	writeJSON(w, status, errorResponse{Error: apiError{Code: code, Message: message}})
 }

@@ -4,6 +4,7 @@ package settings
 import (
 	"database/sql"
 	"encoding/json"
+	"glyphdeck/internal/httpapi"
 	"net/http"
 	"sync"
 )
@@ -97,19 +98,19 @@ type handler struct {
 func (h *handler) list(w http.ResponseWriter, r *http.Request) {
 	all, err := h.mgr.GetAll()
 	if err != nil {
-		writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		httpapi.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		return
 	}
 	if all == nil {
 		all = make(map[string]string)
 	}
-	writeJSON(w, http.StatusOK, all)
+	httpapi.WriteJSON(w, http.StatusOK, all)
 }
 
 func (h *handler) bulkUpdate(w http.ResponseWriter, r *http.Request) {
 	var updates map[string]string
 	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
+		httpapi.WriteJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid JSON"})
 		return
 	}
 	for k, v := range updates {
@@ -117,15 +118,9 @@ func (h *handler) bulkUpdate(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if err := h.mgr.Set(k, v); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			httpapi.WriteJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
-}
-
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
+	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
