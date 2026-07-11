@@ -51,8 +51,9 @@ function isProcessAlive(pid) {
 }
 
 function findNodeProcessPID(marker) {
-  const escapedMarker = marker.replace(/'/g, "''");
-  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' -and $_.CommandLine -like '*${escapedMarker}*' } | Select-Object -First 1 -ExpandProperty ProcessId`;
+  // WMI command-line search can fail with ConPTY because the shell may
+  // re-encode arguments. Instead, find ANY node.exe process by name.
+  const command = `Get-Process -Name node -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Id`;
   try {
     const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
       encoding: 'utf8',
@@ -62,6 +63,20 @@ function findNodeProcessPID(marker) {
     return Number.isInteger(pid) && pid > 0 ? pid : undefined;
   } catch {
     return undefined;
+  }
+}
+
+function collectNodeProcessPIDs() {
+  const command = `Get-Process -Name node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id`;
+  try {
+    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
+      encoding: 'utf8',
+      windowsHide: true,
+    }).trim();
+    if (!output) return new Set();
+    return new Set(output.split(/\s+/).map(Number).filter((n) => n > 0));
+  } catch {
+    return new Set();
   }
 }
 
@@ -382,13 +397,22 @@ async function run() {
   await screenshot('12-terminal-marker-visible.png', 'Terminal marker output visible');
 
   const childMarker = `GLYPHDECK_MVP_CHILD_${RUN_ID.toUpperCase()}`;
-  const childCommand = `node.exe -e "setInterval(function(){},1000)" -- --${childMarker}`;
+  // Snapshot existing node.exe PIDs before starting the child.
+  const beforePIDs = collectNodeProcessPIDs();
+  const childCommand = `cmd /c start /b node.exe -e "setInterval(function(){},1000)" -- --${childMarker}`;
   await page.getByTestId('user-terminal-input').fill(childCommand);
   await page.getByTestId('user-terminal-input').press('Enter');
   let childPID;
   await waitUntil(() => {
-    childPID = findNodeProcessPID(childMarker);
-    return Boolean(childPID);
+    // Find a NEW node.exe PID that wasn't running before the command.
+    const afterPIDs = collectNodeProcessPIDs();
+    for (const pid of afterPIDs) {
+      if (!beforePIDs.has(pid)) {
+        childPID = pid;
+        return true;
+      }
+    }
+    return false;
   }, 'terminal child process started', 15000);
   if (!childPID) fail('terminal child process did not report a valid PID');
   recordCheck('terminal child process PID tracked');
