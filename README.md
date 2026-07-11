@@ -49,6 +49,30 @@ OpenCode server communication uses HTTP Basic Auth credentials from environment 
 
 These must be available in the environment where GlyphDeck's backend runs.
 
+### Admin Authentication
+
+GlyphDeck requires admin authentication to protect API and frontend access:
+
+- **First run:** If no admin is configured, the UI shows a setup screen to create an admin password.
+- **Login:** After setup, the login screen requires the admin password.
+- **Session:** Login sets an HttpOnly cookie; the session persists until the browser closes or the user logs out.
+- **Logout:** Click the door icon (🚪) in the left rail.
+- **Unauthenticated requests** to protected `/api/*` routes return `401`.
+
+**Environment bootstrap:**
+
+Set `GLYPHDECK_ADMIN_PASSWORD` before starting GlyphDeck to create an admin
+on first startup without interactive setup:
+
+```powershell
+$env:GLYPHDECK_ADMIN_PASSWORD = "your-password"
+go run ./cmd/glyphdeck
+```
+
+The password is bcrypt-hashed and stored in SQLite. The raw password is never
+logged. Bootstrap runs only when no admin credential exists; existing admins
+are not overwritten.
+
 ## Run Locally
 
 Shell: PowerShell 7
