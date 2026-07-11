@@ -6,6 +6,14 @@ interface ServerConfig {
   type: string
   url: string
   sshAlias: string
+  workingDir?: string
+  startCommand?: string
+  stopCommand?: string
+  statusCommand?: string
+  lastPid: number
+  lastUrl: string
+  lastStatus: string
+  startedByGlyphdeck: boolean
 }
 
 interface ActiveServer {
@@ -30,6 +38,14 @@ function ServersPanel(_props: ServersPanelProps) {
   const [addType, setAddType] = useState('local')
   const [addUrl, setAddUrl] = useState('')
   const [addSshAlias, setAddSshAlias] = useState('')
+  const [addWorkingDir, setAddWorkingDir] = useState('')
+  const [addStartCmd, setAddStartCmd] = useState('')
+  const [addStopCmd, setAddStopCmd] = useState('')
+  const [addStatusCmd, setAddStatusCmd] = useState('')
+
+  // Remote action loading states.
+  const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({})
+  const [actionMsg, setActionMsg] = useState<Record<string, string>>({})
 
   const loadConfigs = useCallback(async () => {
     try {
@@ -68,7 +84,8 @@ function ServersPanel(_props: ServersPanelProps) {
       const resp = await fetch('/api/server-configs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: addId, name: addName, type: addType, url: addUrl, sshAlias: addSshAlias }),
+        body: JSON.stringify({ id: addId, name: addName, type: addType, url: addUrl, sshAlias: addSshAlias,
+          workingDir: addWorkingDir, startCommand: addStartCmd, stopCommand: addStopCmd, statusCommand: addStatusCmd }),
       })
       if (!resp.ok) throw new Error('Failed to add server config')
       await loadConfigs()
@@ -130,6 +147,26 @@ function ServersPanel(_props: ServersPanelProps) {
       setChecking((prev) => ({ ...prev, [cfg.id]: false }))
     }
   }, [])
+
+  async function remoteAction(cfg: ServerConfig, action: string) {
+    setActionLoading((prev) => ({ ...prev, [cfg.id]: true }))
+    setActionMsg((prev) => ({ ...prev, [cfg.id]: '' }))
+    try {
+      const resp = await fetch(`/api/server-configs/${encodeURIComponent(cfg.id)}/${action}`, { method: 'POST' })
+      const data = await resp.json()
+      setActionMsg((prev) => ({ ...prev, [cfg.id]: data.message || JSON.stringify(data) }))
+      if (action === 'detect' && data.status) {
+        setStatuses((prev) => ({ ...prev, [cfg.id]: data.status }))
+      }
+      if (action === 'start-remote' || action === 'stop-remote') {
+        await loadConfigs()
+      }
+    } catch (err) {
+      setActionMsg((prev) => ({ ...prev, [cfg.id]: err instanceof Error ? err.message : 'Failed' }))
+    } finally {
+      setActionLoading((prev) => ({ ...prev, [cfg.id]: false }))
+    }
+  }
 
   function statusDot(status: string | undefined) {
     const s = status || 'unknown'
@@ -197,6 +234,10 @@ function ServersPanel(_props: ServersPanelProps) {
                   </p>
                   {cfg.url ? <p className="server-card__url">{cfg.url}</p> : null}
                   {cfg.sshAlias ? <p className="server-card__ssh">SSH: {cfg.sshAlias}</p> : null}
+                  {cfg.lastPid > 0 ? <p className="server-card__pid">PID: {cfg.lastPid}</p> : null}
+                  {cfg.lastStatus && cfg.lastStatus !== 'unknown' ? (
+                    <p className="server-card__remote-status">Status: {cfg.lastStatus}</p>
+                  ) : null}
                 </div>
                 <div className="server-card__actions">
                   {isActive ? (
@@ -227,6 +268,29 @@ function ServersPanel(_props: ServersPanelProps) {
                     Remove
                   </button>
                 </div>
+                {cfg.type === 'ssh_alias' && (
+                  <div className="server-card__ssh-actions">
+                    <button className="server-btn server-btn--ssh"
+                      onClick={() => remoteAction(cfg, 'test-ssh')}
+                      disabled={actionLoading[cfg.id]}
+                      data-testid={`test-ssh-${cfg.id}`}>Test SSH</button>
+                    <button className="server-btn server-btn--ssh"
+                      onClick={() => remoteAction(cfg, 'detect')}
+                      disabled={actionLoading[cfg.id]}
+                      data-testid={`detect-${cfg.id}`}>Detect</button>
+                    <button className="server-btn server-btn--ssh"
+                      onClick={() => remoteAction(cfg, 'start-remote')}
+                      disabled={actionLoading[cfg.id]}
+                      data-testid={`start-remote-${cfg.id}`}>Start</button>
+                    <button className="server-btn server-btn--ssh"
+                      onClick={() => remoteAction(cfg, 'stop-remote')}
+                      disabled={actionLoading[cfg.id] || cfg.lastPid <= 0}
+                      data-testid={`stop-remote-${cfg.id}`}>Stop</button>
+                    {actionMsg[cfg.id] ? (
+                      <p className="server-card__action-msg">{actionMsg[cfg.id]}</p>
+                    ) : null}
+                  </div>
+                )}
               </div>
             )
           })}
@@ -257,10 +321,28 @@ function ServersPanel(_props: ServersPanelProps) {
               </div>
             )}
             {addType === 'ssh_alias' && (
+              <>
               <div className="server-form__field">
                 <label htmlFor="server-ssh-alias">SSH Alias</label>
                 <input id="server-ssh-alias" value={addSshAlias} onChange={(e) => setAddSshAlias(e.target.value)} placeholder="my-server" data-testid="server-add-ssh-alias" />
               </div>
+              <div className="server-form__field">
+                <label htmlFor="server-working-dir">Working Directory</label>
+                <input id="server-working-dir" value={addWorkingDir} onChange={(e) => setAddWorkingDir(e.target.value)} placeholder="~" data-testid="server-add-working-dir" />
+              </div>
+              <div className="server-form__field">
+                <label htmlFor="server-start-cmd">Start Command</label>
+                <input id="server-start-cmd" value={addStartCmd} onChange={(e) => setAddStartCmd(e.target.value)} placeholder="opencode serve --port 4096 &" data-testid="server-add-start-cmd" />
+              </div>
+              <div className="server-form__field">
+                <label htmlFor="server-stop-cmd">Stop Command</label>
+                <input id="server-stop-cmd" value={addStopCmd} onChange={(e) => setAddStopCmd(e.target.value)} placeholder="kill <PID>" data-testid="server-add-stop-cmd" />
+              </div>
+              <div className="server-form__field">
+                <label htmlFor="server-status-cmd">Status Command</label>
+                <input id="server-status-cmd" value={addStatusCmd} onChange={(e) => setAddStatusCmd(e.target.value)} placeholder="pgrep -f 'opencode serve'" data-testid="server-add-status-cmd" />
+              </div>
+              </>
             )}
             <div className="server-form__actions">
               <button type="submit" className="server-btn server-btn--save" data-testid="server-add-submit">Add Server</button>

@@ -109,6 +109,15 @@ func (db *DB) migrate() error {
 		type TEXT NOT NULL DEFAULT 'local',
 		url TEXT NOT NULL DEFAULT '',
 		ssh_alias TEXT NOT NULL DEFAULT '',
+		working_dir TEXT NOT NULL DEFAULT '',
+		start_command TEXT NOT NULL DEFAULT '',
+		stop_command TEXT NOT NULL DEFAULT '',
+		status_command TEXT NOT NULL DEFAULT '',
+		last_pid INTEGER NOT NULL DEFAULT 0,
+		last_url TEXT NOT NULL DEFAULT '',
+		last_status TEXT NOT NULL DEFAULT 'unknown',
+		last_checked_at TEXT NOT NULL DEFAULT '',
+		started_by_glyphdeck INTEGER NOT NULL DEFAULT 0,
 		created_at TEXT NOT NULL DEFAULT (datetime('now')),
 		updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 	);
