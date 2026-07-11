@@ -123,7 +123,7 @@ func newTermSession(shellPath string, shellArgs []string, cwd string) (termSessi
 	var pi windows.ProcessInformation
 	if err := windows.CreateProcess(
 		nil, cmdLine16, nil, nil, false,
-		windows.CREATE_UNICODE_ENVIRONMENT|windows.EXTENDED_STARTUPINFO_PRESENT,
+		windows.CREATE_UNICODE_ENVIRONMENT|windows.EXTENDED_STARTUPINFO_PRESENT|windows.CREATE_NO_WINDOW,
 		nil, cwd16, &si.StartupInfo, &pi,
 	); err != nil {
 		attrList.Delete()
