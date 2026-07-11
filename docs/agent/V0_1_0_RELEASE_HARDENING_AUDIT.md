@@ -91,14 +91,15 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-None. All tracked pre-v0.1.0 issues are resolved or deferred with documented blockers:
-
-- **Windows ConPTY**: Implementation exists in `internal/terminal/session_windows.go` but is
-  disabled (pipe-based fallback active). The blocker: child processes started inside a ConPTY
-  session are not visible to `Get-Process` / WMI from outside the pseudo console, so the
-  smoke-test child-process detection fails. The PID-diff detection approach in the smoke harness
-  works with pipe-based terminals but not with ConPTY. ConPTY enablement requires either a
-  different child-process detection method or Windows API changes.
+1. **Windows ConPTY disabled — pipe-based terminal active.** The ConPTY implementation
+   exists in `internal/terminal/session_windows.go` but is disabled. Child processes
+   started inside a ConPTY session are not visible to `Get-CimInstance Win32_Process`
+   queries (by command line, process name, parent PID, or PID-diff) from outside the
+   pseudo console. The smoke test uses WMI PID-diff detection which works with
+   pipe-based terminals but fails under ConPTY. Three detection approaches were tested
+   and failed: (1) command-line search by marker, (2) `Get-Process -Name node`,
+   (3) parent-PID filter via `Get-CimInstance`. ConPTY enablement requires either
+   in-terminal process tracking or Windows API changes.
 
 ## First-Run Admin Auth
 
