@@ -91,15 +91,14 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-1. **Windows ConPTY disabled — pipe-based terminal active.** The ConPTY implementation
-   exists in `internal/terminal/session_windows.go` but is disabled. Child processes
-   started inside a ConPTY session are not visible to `Get-CimInstance Win32_Process`
-   queries (by command line, process name, parent PID, or PID-diff) from outside the
-   pseudo console. The smoke test uses WMI PID-diff detection which works with
-   pipe-based terminals but fails under ConPTY. Three detection approaches were tested
-   and failed: (1) command-line search by marker, (2) `Get-Process -Name node`,
-   (3) parent-PID filter via `Get-CimInstance`. ConPTY enablement requires either
-   in-terminal process tracking or Windows API changes.
+None. All tracked pre-v0.1.0 issues are resolved.
+
+### Windows ConPTY
+
+Enabled. The terminal uses `CreatePseudoConsole` via `golang.org/x/sys/windows` for true
+PTY support. Child-process detection and cleanup use the Job Object (`QueryInformationJobObject`)
+rather than external WMI enumeration. Smoke validation passes 17/17 including terminal marker,
+child-process startup/cleanup, and cwd display.
 
 ## First-Run Admin Auth
 

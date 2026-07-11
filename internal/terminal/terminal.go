@@ -32,6 +32,8 @@ type Status struct {
 	Running   bool   `json:"running"`
 	Cwd       string `json:"cwd"`
 	Shell     string `json:"shell"`
+	ShellPID  int    `json:"shellPid"`
+	ChildPIDs []int  `json:"childPids,omitempty"`
 	CreatedAt string `json:"createdAt"`
 }
 
@@ -139,6 +141,7 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 		Running:   true,
 		Cwd:       cwd,
 		Shell:     m.shellPath,
+		ShellPID:  session.process().Pid,
 		CreatedAt: term.createdAt.Format(time.RFC3339),
 	}, nil
 }
@@ -234,12 +237,22 @@ func (m *Manager) Status(id string) (*Status, error) {
 	term.mu.Lock()
 	defer term.mu.Unlock()
 
+	shellPID := 0
+	var childPIDs []int
+	if term.session != nil {
+		shellPID = term.session.process().Pid
+	}
+	if term.processTree != nil && !term.closed {
+		childPIDs = term.processTree.PIDs()
+	}
 	return &Status{
 		ID:        term.ID,
 		ProjectID: term.ProjectID,
 		Running:   !term.closed,
 		Cwd:       term.Cwd,
 		Shell:     m.shellPath,
+		ShellPID:  shellPID,
+		ChildPIDs: childPIDs,
 		CreatedAt: term.createdAt.Format(time.RFC3339),
 	}, nil
 }

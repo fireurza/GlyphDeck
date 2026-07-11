@@ -50,32 +50,24 @@ function isProcessAlive(pid) {
   }
 }
 
-function findNodeProcessPID(marker) {
-  const escapedMarker = marker.replace(/'/g, "''");
-  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' -and $_.CommandLine -like '*${escapedMarker}*' } | Select-Object -First 1 -ExpandProperty ProcessId`;
+function findDescendantPID(shellPID) {
+  // Use wmic to find child processes. Unlike Get-CimInstance (WMI),
+  // wmic queries the NT kernel object manager directly and can see
+  // processes inside ConPTY job objects.
+  const command = `wmic process where (ParentProcessId=${shellPID} and Name='node.exe') get ProcessId /format:value`;
   try {
-    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
+    const output = execFileSync('cmd.exe', ['/c', command], {
       encoding: 'utf8',
       windowsHide: true,
     }).trim();
-    const pid = Number(output);
-    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
+    const match = output.match(/ProcessId=(\d+)/);
+    if (match) {
+      const pid = Number(match[1]);
+      if (Number.isInteger(pid) && pid > 0) return pid;
+    }
+    return undefined;
   } catch {
     return undefined;
-  }
-}
-
-function collectNodeProcessPIDs() {
-  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' } | Select-Object -ExpandProperty ProcessId`;
-  try {
-    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
-      encoding: 'utf8',
-      windowsHide: true,
-    }).trim();
-    if (!output) return new Set();
-    return new Set(output.split(/\s+/).map(Number).filter((n) => n > 0));
-  } catch {
-    return new Set();
   }
 }
 
@@ -381,6 +373,8 @@ async function run() {
     fail('validation terminal start did not return a terminal ID');
   }
   validationTerminalID = createdTerminal.id;
+  const terminalShellPID = createdTerminal.shellPid;
+  if (!terminalShellPID) fail('terminal start did not report a shell PID');
   recordCheck('validation terminal ID tracked for cleanup');
   await waitUntil(async () => (
     ((await page.getByTestId('user-terminal-status').textContent()) || '').includes('Running')
@@ -396,15 +390,17 @@ async function run() {
   await screenshot('12-terminal-marker-visible.png', 'Terminal marker output visible');
 
   const childMarker = `GLYPHDECK_MVP_CHILD_${RUN_ID.toUpperCase()}`;
-  const beforePIDs = collectNodeProcessPIDs();
   const childCommand = `node.exe -e "setInterval(function(){},1000)" -- --${childMarker}`;
   await page.getByTestId('user-terminal-input').fill(childCommand);
   await page.getByTestId('user-terminal-input').press('Enter');
   let childPID;
-  await waitUntil(() => {
-    const afterPIDs = collectNodeProcessPIDs();
-    for (const pid of afterPIDs) {
-      if (!beforePIDs.has(pid)) {
+  await waitUntil(async () => {
+    // Query the terminal status for child PIDs from the Job Object.
+    const status = await apiGet(`/api/terminals/${encodeURIComponent(validationTerminalID)}/status`);
+    const pids = status.childPids || [];
+    // Find a node.exe PID that is NOT the shell PID.
+    for (const pid of pids) {
+      if (pid !== terminalShellPID) {
         childPID = pid;
         return true;
       }
