@@ -51,9 +51,8 @@ function isProcessAlive(pid) {
 }
 
 function findNodeProcessPID(marker) {
-  // WMI command-line search can fail with ConPTY because the shell may
-  // re-encode arguments. Instead, find ANY node.exe process by name.
-  const command = `Get-Process -Name node -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty Id`;
+  const escapedMarker = marker.replace(/'/g, "''");
+  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' -and $_.CommandLine -like '*${escapedMarker}*' } | Select-Object -First 1 -ExpandProperty ProcessId`;
   try {
     const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
       encoding: 'utf8',
@@ -67,7 +66,7 @@ function findNodeProcessPID(marker) {
 }
 
 function collectNodeProcessPIDs() {
-  const command = `Get-Process -Name node -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Id`;
+  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' } | Select-Object -ExpandProperty ProcessId`;
   try {
     const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
       encoding: 'utf8',
@@ -397,14 +396,12 @@ async function run() {
   await screenshot('12-terminal-marker-visible.png', 'Terminal marker output visible');
 
   const childMarker = `GLYPHDECK_MVP_CHILD_${RUN_ID.toUpperCase()}`;
-  // Snapshot existing node.exe PIDs before starting the child.
   const beforePIDs = collectNodeProcessPIDs();
-  const childCommand = `cmd /c start /b node.exe -e "setInterval(function(){},1000)" -- --${childMarker}`;
+  const childCommand = `node.exe -e "setInterval(function(){},1000)" -- --${childMarker}`;
   await page.getByTestId('user-terminal-input').fill(childCommand);
   await page.getByTestId('user-terminal-input').press('Enter');
   let childPID;
   await waitUntil(() => {
-    // Find a NEW node.exe PID that wasn't running before the command.
     const afterPIDs = collectNodeProcessPIDs();
     for (const pid of afterPIDs) {
       if (!beforePIDs.has(pid)) {
