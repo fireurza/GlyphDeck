@@ -5,7 +5,6 @@
  * execution, so every generated artifact stays in the milestone directory.
  */
 const { chromium } = require('playwright');
-const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -47,27 +46,6 @@ function isProcessAlive(pid) {
     return true;
   } catch (error) {
     return error?.code === 'EPERM';
-  }
-}
-
-function findDescendantPID(shellPID) {
-  // Use wmic to find child processes. Unlike Get-CimInstance (WMI),
-  // wmic queries the NT kernel object manager directly and can see
-  // processes inside ConPTY job objects.
-  const command = `wmic process where (ParentProcessId=${shellPID} and Name='node.exe') get ProcessId /format:value`;
-  try {
-    const output = execFileSync('cmd.exe', ['/c', command], {
-      encoding: 'utf8',
-      windowsHide: true,
-    }).trim();
-    const match = output.match(/ProcessId=(\d+)/);
-    if (match) {
-      const pid = Number(match[1]);
-      if (Number.isInteger(pid) && pid > 0) return pid;
-    }
-    return undefined;
-  } catch {
-    return undefined;
   }
 }
 
