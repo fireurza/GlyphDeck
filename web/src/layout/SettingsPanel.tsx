@@ -96,7 +96,7 @@ function SettingsPanel() {
             type="text"
             value={settings['default_project_dir'] || ''}
             onChange={(e) => updateField('default_project_dir', e.target.value)}
-            placeholder="e.g. C:\Users\Fireurza\Documents\Code"
+            placeholder="e.g. C:\Users\Example\Documents\Code"
             data-testid="settings-default-project-dir"
           />
           <p className="settings-hint">Default directory when adding new projects.</p>

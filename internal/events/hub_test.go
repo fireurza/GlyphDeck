@@ -300,12 +300,13 @@ func TestHub_ProjectFiltering(t *testing.T) {
 		Data: map[string]any{"sessionId": "ses_1"},
 	})
 
-	// Kill the bridge by closing mock stream.
+	// Kill the bridge by closing mock stream, then close test server to
+	// force the subscriber HTTP handler to exit immediately.
 	cancel()
 	mockStream.close()
+	ts.Close()
 
 	waitForWaitGroup(t, "filtered subscriber goroutine exits", &wg)
-	ts.Close()
 
 	mu.Lock()
 	defer mu.Unlock()
