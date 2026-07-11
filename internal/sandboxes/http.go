@@ -26,6 +26,10 @@ func RegisterHandlers(mux *http.ServeMux, registry *Registry) {
 	mux.HandleFunc("POST /api/server-configs", h.addConfig)
 	mux.HandleFunc("DELETE /api/server-configs/{id}", h.deleteConfig)
 	mux.HandleFunc("POST /api/server-configs/{id}/check", h.checkConfig)
+	mux.HandleFunc("POST /api/server-configs/{id}/test-ssh", h.testSSH)
+	mux.HandleFunc("POST /api/server-configs/{id}/detect", h.detect)
+	mux.HandleFunc("POST /api/server-configs/{id}/start-remote", h.startRemote)
+	mux.HandleFunc("POST /api/server-configs/{id}/stop-remote", h.stopRemote)
 }
 
 func (h *Handler) listConfigs(w http.ResponseWriter, r *http.Request) {
@@ -123,4 +127,56 @@ func (h *Handler) checkConfig(w http.ResponseWriter, r *http.Request) {
 		"id":     cfg.ID,
 		"status": status,
 	})
+}
+
+func (h *Handler) testSSH(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	result, err := h.registry.TestSSH(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			httpapi.WriteError(w, http.StatusNotFound, "not_found", "Server config not found.")
+			return
+		}
+		httpapi.WriteError(w, http.StatusBadRequest, "ssh_error", err.Error())
+		return
+	}
+	success := result.Err == nil
+	msg := "SSH connection OK"
+	if !success {
+		msg = result.Err.Error()
+	}
+	httpapi.WriteJSON(w, http.StatusOK, map[string]any{
+		"success": success,
+		"message": msg,
+	})
+}
+
+func (h *Handler) detect(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	status, err := h.registry.Detect(r.Context(), id)
+	if err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "detect_error", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, status)
+}
+
+func (h *Handler) startRemote(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	result, err := h.registry.StartRemote(r.Context(), id)
+	if err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "start_error", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, result)
+}
+
+func (h *Handler) stopRemote(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	result, err := h.registry.StopRemote(r.Context(), id)
+	if err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "stop_error", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, result)
 }
