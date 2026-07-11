@@ -310,7 +310,10 @@ func TestMiddleware_RejectsUnauthenticated(t *testing.T) {
 	ts := httptest.NewServer(wrapped)
 	defer ts.Close()
 
-	resp, _ := ts.Client().Get(ts.URL + "/api/protected")
+	resp, err := ts.Client().Get(ts.URL + "/api/protected")
+	if err != nil {
+		t.Fatalf("GET /api/protected: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusUnauthorized {
@@ -338,8 +341,11 @@ func TestMiddleware_AllowsAuthenticated(t *testing.T) {
 	defer ts.Close()
 
 	// Login on the same server to get a session cookie scoped to this domain.
-	loginResp, _ := ts.Client().Post(ts.URL+"/api/auth/login", "application/json",
+	loginResp, err := ts.Client().Post(ts.URL+"/api/auth/login", "application/json",
 		strings.NewReader(`{"password":"password123"}`))
+	if err != nil {
+		t.Fatalf("POST login: %v", err)
+	}
 	cookies := loginResp.Cookies()
 	loginResp.Body.Close()
 
@@ -370,7 +376,10 @@ func TestMiddleware_AllowsPublicPaths(t *testing.T) {
 	ts := httptest.NewServer(wrapped)
 	defer ts.Close()
 
-	resp, _ := ts.Client().Get(ts.URL + "/healthz")
+	resp, err := ts.Client().Get(ts.URL + "/healthz")
+	if err != nil {
+		t.Fatalf("GET /healthz: %v", err)
+	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
