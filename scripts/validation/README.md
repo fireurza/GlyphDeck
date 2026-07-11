@@ -4,7 +4,7 @@ Controlled, deterministic, repo-local validation for GlyphDeck. Runs hidden
 start/stop/smoke flows without global process kills, visible editor windows, or
 fragile browser selectors.
 
-## v0.1.0 Smoke
+## v0.1.1 Smoke
 
 | Script | Purpose |
 |---|---|

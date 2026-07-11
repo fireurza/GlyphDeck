@@ -1,5 +1,5 @@
 /*
- * GlyphDeck v0.1.0 release-candidate smoke.
+ * GlyphDeck v0.1.1 release-candidate smoke.
  *
  * The runner copies this file into .glyphdeck/validation/mvp/scripts before
  * execution, so every generated artifact stays in the milestone directory.
@@ -151,7 +151,7 @@ async function requireNoErrorStates(label) {
 
 function writeManifest(result, failure) {
   const lines = [
-    '# v0.1.0 Release Candidate Smoke — Manifest',
+    '# v0.1.1 Release Candidate Smoke — Manifest',
     '',
     '## Run info',
     `- Run ID: ${RUN_ID}`,
@@ -220,11 +220,11 @@ async function run() {
 
   await requireVisible('app-shell', 'release app shell visible');
   const releaseLabel = (await page.getByTestId('top-version-label').textContent())?.trim();
-  if (releaseLabel !== 'v0.1.0') fail(`release label is ${JSON.stringify(releaseLabel)}, want v0.1.0`);
-  recordCheck('v0.1.0 release label visible');
+  if (releaseLabel !== 'v0.1.1') fail(`release label is ${JSON.stringify(releaseLabel)}, want v0.1.1`);
+  recordCheck('v0.1.1 release label visible');
   await requireAbsent('bottom-settings-tab', 'Settings is not a bottom-dock tab');
   await requireNoErrorStates('clean state');
-  await screenshot('01-clean-state.png', 'Release shell, v0.1.0 label, three-tab bottom dock');
+  await screenshot('01-clean-state.png', 'Release shell, v0.1.1 label, three-tab bottom dock');
 
   // Settings must be reachable from the rail, rendered as a modal, and persist
   // through an unmount/reopen cycle without consuming the bottom dock.
@@ -455,13 +455,13 @@ async function run() {
   try {
     await run();
     writeManifest('PASS');
-    console.log('=== v0.1.0 Release Candidate Smoke PASSED ===');
+    console.log('=== v0.1.1 Release Candidate Smoke PASSED ===');
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
     if (browserErrors.length > 0) {
       failure += `\nBrowser errors:\n${browserErrors.join('\n')}`;
     }
-    console.error(`=== v0.1.0 Release Candidate Smoke FAILED: ${failure} ===`);
+    console.error(`=== v0.1.1 Release Candidate Smoke FAILED: ${failure} ===`);
     if (page) {
       try {
         await screenshot('99-failure.png', 'Failure state');

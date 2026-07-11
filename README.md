@@ -107,7 +107,7 @@ verifies PID ownership before killing. Blanket `pkill` is never used.
 
 ## Security Model
 
-GlyphDeck v0.1.0 is designed for **local use**.
+GlyphDeck v0.1.1 is designed for **local use**.
 
 - Binds to `127.0.0.1` (loopback) by default.
 - Mutating API requests require same-origin `Origin` and loopback host.
@@ -151,4 +151,9 @@ Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines
 
 ## License
 
-[MIT](LICENSE)
+GlyphDeck is source-available. Noncommercial use is governed by the
+[PolyForm Noncommercial License 1.0.0](LICENSE).
+
+**Commercial use requires a separate written commercial license from
+FireGlyph Studios.** See [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md)
+for details.

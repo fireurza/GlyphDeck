@@ -15,7 +15,7 @@ Do not open a public issue for security vulnerabilities.
 
 ## Security Model
 
-GlyphDeck v0.1.0 is designed for **local/private-network use only**.
+GlyphDeck v0.1.1 is designed for **local/private-network use only**.
 
 - Binds to `127.0.0.1` (loopback) by default.
 - Mutating API requests require same-origin `Origin` and loopback host.
