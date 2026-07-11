@@ -4,6 +4,8 @@ A local-first web workspace for managing [OpenCode](https://opencode.ai) project
 servers, sessions, and terminals — all from a browser UI.
 
 [![Verify](https://github.com/fireurza/GlyphDeck/actions/workflows/verify.yml/badge.svg)](https://github.com/fireurza/GlyphDeck/actions/workflows/verify.yml)
+[![CodeQL](https://github.com/fireurza/GlyphDeck/actions/workflows/codeql.yml/badge.svg)](https://github.com/fireurza/GlyphDeck/actions/workflows/codeql.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/fireurza/GlyphDeck/badge)](https://securityscorecards.dev/viewer/?uri=github.com/fireurza/GlyphDeck)
 
 ## What It Does
 
