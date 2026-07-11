@@ -34,7 +34,12 @@ func TestRegistryAddValidProject(t *testing.T) {
 		t.Fatalf("Name = %q, want GlyphDeck", project.Name)
 	}
 	if project.Path != filepath.Clean(projectDir) {
-		t.Fatalf("Path = %q, want %q", project.Path, filepath.Clean(projectDir))
+		// Platform symlinks (macOS /private) or short name resolution
+		// (Windows 8.3) can cause path mismatch. Accept either form.
+		evaled, err := filepath.EvalSymlinks(projectDir)
+		if err != nil || project.Path != filepath.Clean(evaled) {
+			t.Fatalf("Path = %q, want %q or %q", project.Path, filepath.Clean(projectDir), filepath.Clean(evaled))
+		}
 	}
 	if !project.Trusted {
 		t.Fatal("Trusted = false, want true")
