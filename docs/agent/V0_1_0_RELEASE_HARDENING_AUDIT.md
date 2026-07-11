@@ -91,15 +91,18 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-1. OpenCode server/sandbox lifecycle is incomplete. The foundation (server configs,
-   attach/detach, status check) is implemented. Remaining work:
-   - Remote SSH detect/start/stop (SSH config aliases stored, endpoints not yet built).
-   - Remote agent/skill/MCP sync (future feature, not planned for v0.1.0).
-
-2. Windows ConPTY is disabled. The implementation exists in
+1. Windows ConPTY is disabled. The implementation exists in
    `internal/terminal/session_windows.go` but the pipe-based fallback is active
    because the smoke-test child-process WMI-detection step fails when ConPTY
    is enabled. This must be resolved before enabling the PTY path.
+
+## Remote SSH Lifecycle
+
+- SSH config aliases are the supported remote identity model (stored in GlyphDeck SQLite).
+- Remote servers can be tested, detected, started, and stopped via SSH.
+- Stop is PID-scoped: only the recorded PID is killed; blanket `pkill opencode` is never used.
+- Start captures PID and URL; stop verifies PID belongs to OpenCode before killing.
+- Remote sync of agents/plugins/skills/MCP/code-standards remains future work.
 
 ## First-Run Admin Auth
 
