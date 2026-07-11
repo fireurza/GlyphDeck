@@ -89,8 +89,8 @@ jobs:
 
       - name: Generate SBOM
         run: |
-          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v2.2.1
-          $(go env GOPATH)/bin/cyclonedx-gomod mod -json -licenses -output dist/cyclonedx-sbom.json -main cmd/glyphdeck
+          go install github.com/CycloneDX/cyclonedx-gomod@v1.10.0
+          $(go env GOPATH)/bin/cyclonedx-gomod app -json -licenses -output dist/cyclonedx-sbom.json -main cmd/glyphdeck
 
       - name: Attest release binaries
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
