@@ -83,15 +83,18 @@ try {
 $oldPort = $env:GLYPHDECK_PORT
 $oldDataDir = $env:GLYPHDECK_DATA_DIR
 $oldDevTools = $env:GLYPHDECK_DEV_TOOLS
+$oldAdminPass = $env:GLYPHDECK_ADMIN_PASSWORD
 try {
   $env:GLYPHDECK_PORT = [string]$port
   $env:GLYPHDECK_DATA_DIR = $dataDir
   $env:GLYPHDECK_DEV_TOOLS = "1"
+  $env:GLYPHDECK_ADMIN_PASSWORD = "mvp-smoke-admin-pass"
   $process = Start-Process -FilePath $binaryPath -WorkingDirectory $launchDir -WindowStyle Hidden -PassThru -RedirectStandardOutput $backendLog -RedirectStandardError $backendErrorLog
 } finally {
   $env:GLYPHDECK_PORT = $oldPort
   $env:GLYPHDECK_DATA_DIR = $oldDataDir
   $env:GLYPHDECK_DEV_TOOLS = $oldDevTools
+  $env:GLYPHDECK_ADMIN_PASSWORD = $oldAdminPass
 }
 
 [System.IO.File]::WriteAllText($pidPath, [string]$process.Id)

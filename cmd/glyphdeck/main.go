@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"glyphdeck/internal/auth"
 	"glyphdeck/internal/devtools"
 	"glyphdeck/internal/events"
 	"glyphdeck/internal/httpapi"
@@ -78,6 +79,16 @@ func main() {
 	}
 	sandboxes.RegisterHandlers(mux, sandboxReg)
 
+	// Auth store — credentials and sessions.
+	authStore, err := auth.NewStore(db.Conn())
+	if err != nil {
+		log.Fatalf("auth store error: %v", err)
+	}
+	auth.RegisterHandlers(mux, authStore)
+
+	// Bootstrap admin from environment if no admin exists.
+	bootstrapAdmin(authStore)
+
 	// Sessions.
 	sessionsProjectAdapter := &projectPathsResolverAdapter{registry: registry, notFoundErr: sessions.ErrProjectNotFound}
 	sessionsMgr := sessions.NewManager(manager, sessionsProjectAdapter)
@@ -129,7 +140,7 @@ func main() {
 
 	srv := &http.Server{
 		Addr:         addr,
-		Handler:      localMutationGuard(mux),
+		Handler:      auth.Middleware(authStore)(localMutationGuard(mux)),
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
@@ -261,6 +272,33 @@ func (a *terminalProjectResolverAdapter) GetPath(ctx context.Context, id string)
 		return "", err
 	}
 	return project.Path, nil
+}
+
+// bootstrapAdmin creates an admin from GLYPHDECK_ADMIN_PASSWORD if no admin exists.
+func bootstrapAdmin(store *auth.Store) {
+	password := os.Getenv("GLYPHDECK_ADMIN_PASSWORD")
+	if password == "" {
+		return
+	}
+	ctx := context.Background()
+	hasAdmin, err := store.HasAdmin(ctx)
+	if err != nil {
+		log.Printf("auth bootstrap: error checking admin: %v", err)
+		return
+	}
+	if hasAdmin {
+		return
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		log.Printf("auth bootstrap: error hashing password: %v", err)
+		return
+	}
+	if err := store.SetAdminHash(ctx, hash); err != nil {
+		log.Printf("auth bootstrap: error creating admin: %v", err)
+		return
+	}
+	log.Println("auth bootstrap: admin created from GLYPHDECK_ADMIN_PASSWORD")
 }
 
 // serveFrontend serves the React frontend embedded in the release binary.
