@@ -5,12 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"glyphdeck/internal/lifecycle"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"glyphdeck/internal/lifecycle"
 )
 
 // Terminal represents a running interactive shell session.
@@ -65,6 +68,57 @@ func NewManager(resolver ProjectResolver) *Manager {
 	}
 }
 
+func resolveAndValidateCWD(ctx context.Context, resolver ProjectResolver, projectID, cwd string) (string, error) {
+	cleanCwd := filepath.Clean(cwd)
+	var err error
+	cleanCwd, err = filepath.EvalSymlinks(cleanCwd)
+	if err != nil {
+		return "", fmt.Errorf("resolve cwd: %w", err)
+	}
+
+	if resolver == nil {
+		cleanCwd = filepath.Clean(cleanCwd)
+		if _, err := os.Stat(cleanCwd); err != nil {
+			return "", fmt.Errorf("cwd does not exist: %w", err)
+		}
+		return cleanCwd, nil
+	}
+
+	projectRoot, err := resolver.GetPath(ctx, projectID)
+	if err != nil {
+		return "", fmt.Errorf("resolve project root: %w", err)
+	}
+
+	cleanRoot, err := filepath.EvalSymlinks(filepath.Clean(projectRoot))
+	if err != nil {
+		return "", fmt.Errorf("resolve project root: %w", err)
+	}
+
+	if !pathIsDescendant(cleanRoot, cleanCwd) {
+		return "", fmt.Errorf("cwd is not within the project root")
+	}
+
+	cleanCwd = filepath.Clean(cleanCwd)
+	if _, err := os.Stat(cleanCwd); err != nil {
+		return "", fmt.Errorf("cwd does not exist: %w", err)
+	}
+	return cleanCwd, nil
+}
+
+func pathIsDescendant(root, child string) bool {
+	rootSlash := filepath.ToSlash(root)
+	childSlash := filepath.ToSlash(child)
+
+	if rootSlash == childSlash {
+		return true
+	}
+	if !strings.HasPrefix(childSlash, rootSlash+"/") {
+		return false
+	}
+	remaining := childSlash[len(rootSlash)+1:]
+	return remaining != "" && !strings.Contains(remaining, "..")
+}
+
 // detectShell returns the shell path and args for the current platform.
 func detectShell() (string, []string) {
 	if _, err := exec.LookPath("pwsh.exe"); err == nil {
@@ -93,11 +147,13 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 	if cwd == "" {
 		return nil, fmt.Errorf("cwd is required")
 	}
-	if _, err := os.Stat(cwd); err != nil {
-		return nil, fmt.Errorf("cwd does not exist: %w", err)
+
+	cleanCwd, err := resolveAndValidateCWD(ctx, m.resolver, projectID, cwd)
+	if err != nil {
+		return nil, fmt.Errorf("validate cwd: %w", err)
 	}
 
-	session, err := newTermSession(m.shellPath, m.shellArgs, cwd)
+	session, err := newTermSession(m.shellPath, m.shellArgs, cleanCwd)
 	if err != nil {
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
@@ -117,7 +173,7 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 	term := &Terminal{
 		ID:          id,
 		ProjectID:   projectID,
-		Cwd:         cwd,
+		Cwd:         cleanCwd,
 		session:     session,
 		processTree: processTree,
 		createdAt:   time.Now(),
@@ -139,7 +195,7 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 		ID:        id,
 		ProjectID: projectID,
 		Running:   true,
-		Cwd:       cwd,
+		Cwd:       cleanCwd,
 		Shell:     m.shellPath,
 		ShellPID:  session.process().Pid,
 		CreatedAt: term.createdAt.Format(time.RFC3339),

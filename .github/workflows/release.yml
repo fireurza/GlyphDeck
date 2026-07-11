@@ -7,8 +7,6 @@ on:
 
 permissions:
   contents: read
-  id-token: write
-  attestations: write
 
 jobs:
   validate:
@@ -88,12 +86,31 @@ jobs:
           sha256sum glyphdeck-* > checksums.txt
 
       - name: Attest release binaries
+        id: attest
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
           subject-path: dist/*
 
+      - name: Copy attestation bundle
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+          cp "${{ steps.attest.outputs.bundle-path }}" "dist/glyphdeck-${TAG}.sigstore.json"
+
+      - name: Generate SBOM
+        uses: CycloneDX/gh-gomod-generate-sbom@efb74210fb404f88c57e22b9ba6a69f2a969b1ee # v2.0.0
+        with:
+          version: v1
+          args: mod -licenses -json -output dist/glyphdeck-${{ github.ref_name }}.cdx.json
+
+      - name: Attest SBOM
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-path: dist/glyphdeck-${{ github.ref_name }}.cdx.json
+          predicate-type: https://spdx.dev/Document
+
       - name: Create Release
         uses: softprops/action-gh-release@2bb465e97f322d3cb2a965294d483e0d26a67aa9 # v3.0.1
         with:
-          files: dist/*
+          files: |
+            dist/*
           generate_release_notes: true

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"log"
+	"net"
 	"net/http"
 	"strings"
 
@@ -13,6 +14,40 @@ import (
 const (
 	sessionCookieName = "glyphdeck_session"
 )
+
+func newSessionCookie(value string, maxAge int, r *http.Request) *http.Cookie {
+	return &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   cookieShouldBeSecure(r),
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   maxAge,
+	}
+}
+
+func cookieShouldBeSecure(r *http.Request) bool {
+	if r.TLS != nil {
+		return true
+	}
+	if !isLoopbackRequest(r) {
+		return true
+	}
+	return false
+}
+
+func isLoopbackRequest(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.Host)
+	if err != nil {
+		host = r.Host
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return ip.IsLoopback()
+	}
+	return false
+}
 
 // Handler serves auth HTTP endpoints.
 type Handler struct {
@@ -111,14 +146,7 @@ func (h *Handler) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    token,
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   0, // session cookie (deleted on browser close)
-	})
+	http.SetCookie(w, newSessionCookie(token, 0, r))
 
 	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"message": "Logged in."})
 }
@@ -129,14 +157,7 @@ func (h *Handler) handleLogout(w http.ResponseWriter, r *http.Request) {
 		_ = h.store.DeleteSession(r.Context(), token)
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    "",
-		Path:     "/",
-		HttpOnly: true,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1,
-	})
+	http.SetCookie(w, newSessionCookie("", -1, r))
 
 	httpapi.WriteJSON(w, http.StatusOK, map[string]string{"message": "Logged out."})
 }

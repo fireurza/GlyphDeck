@@ -59,3 +59,27 @@ func TestCloseAllTerminatesEveryTrackedProcess(t *testing.T) {
 		t.Fatalf("tree2.Close() calls = %d, want 1", tree2.closed)
 	}
 }
+
+func FuzzPathIsDescendant(f *testing.F) {
+	seeds := []struct{ root, child string }{
+		{"/home/user/project", "/home/user/project/src"},
+		{"/home/user/project", "/home/user/project"},
+		{"/home/user/project", "/home/user/other"},
+		{"/home/user/project", "/home/user/../../../etc/passwd"},
+		{"/home/user/project", "/home/user/project/.."},
+		{"C:\\Users\\proj", "C:\\Users\\proj\\src"},
+		{"C:\\Users\\proj", "C:\\Users\\other"},
+		{"/home/user/proj", "/home/user/proj-sibling"},
+		{"/tmp/a", "/tmp/a/./b"},
+	}
+	for _, s := range seeds {
+		f.Add(s.root, s.child)
+	}
+
+	f.Fuzz(func(t *testing.T, root, child string) {
+		result := pathIsDescendant(root, child)
+		if root == child && !result {
+			t.Errorf("pathIsDescendant(%q, %q) = false, want true (same path)", root, child)
+		}
+	})
+}

@@ -5,7 +5,7 @@ set -e
 
 echo "=== Building frontend ==="
 cd web
-npm install
+npm ci
 npm run build
 cd ..
 

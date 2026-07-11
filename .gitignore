@@ -60,6 +60,9 @@ coverage/
 # Go workspace
 go.work
 
+# Go fuzz corpus (auto-generated, not committed)
+**/testdata/fuzz/
+
 # CortexKit
 .cortexkit/
 

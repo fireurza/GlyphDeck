@@ -52,4 +52,4 @@ local development setup instructions.
 
 GlyphDeck is source-available under the PolyForm Noncommercial License 1.0.0.
 Commercial use requires a separate written license from FireGlyph Studios.
-See [LICENSE](../LICENSE) and [COMMERCIAL-LICENSING.md](../COMMERCIAL-LICENSING.md).
+See [LICENSE](LICENSE) and [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md).

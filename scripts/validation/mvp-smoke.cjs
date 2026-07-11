@@ -149,6 +149,23 @@ async function requireNoErrorStates(label) {
   recordCheck(`${label}: no unexpected error banners`);
 }
 
+function sanitizeFailureDiagnostic(message) {
+  if (typeof message !== 'string' || message.length === 0) {
+    return 'An internal smoke-check failure occurred.';
+  }
+
+  let sanitized = message
+    .replace(/https?:\/\/\S+/gi, '<url-removed>')
+    .replace(/Bearer\s+\S+/gi, '<token-removed>')
+    .replace(/\b[a-f0-9]{32,}\b/gi, '<hash-removed>')
+    .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '');
+
+  if (sanitized.length > 500) {
+    sanitized = sanitized.slice(0, 500) + '...';
+  }
+  return sanitized;
+}
+
 function writeManifest(result, failure) {
   const lines = [
     '# v0.1.1 Release Candidate Smoke — Manifest',
@@ -157,7 +174,7 @@ function writeManifest(result, failure) {
     `- Run ID: ${RUN_ID}`,
     `- Result: ${result}`,
     `- Terminal marker: ${TERMINAL_MARKER}`,
-    `- Validation URL: ${BASE_URL}`,
+    '- Validation target: GlyphDeck v0.1.1 (loopback)',
     '- App data: isolated under `.glyphdeck/validation/mvp/data/`.',
     '',
     '## Assertions',
@@ -171,7 +188,7 @@ function writeManifest(result, failure) {
     '',
   ];
   if (failure) {
-    lines.push('## Failure', '', `- ${failure}`, '');
+    lines.push('## Failure', '', `- ${sanitizeFailureDiagnostic(failure)}`, '');
   }
   fs.writeFileSync(path.join(SCREENSHOT_DIR, 'manifest.md'), lines.join('\n'));
 }
@@ -459,7 +476,8 @@ async function run() {
   } catch (error) {
     failure = error instanceof Error ? error.message : String(error);
     if (browserErrors.length > 0) {
-      failure += `\nBrowser errors:\n${browserErrors.join('\n')}`;
+      const sanitizedErrors = browserErrors.map((err) => sanitizeFailureDiagnostic(err)).join('\n');
+      failure += `\nBrowser errors:\n${sanitizedErrors}`;
     }
     console.error(`=== v0.1.1 Release Candidate Smoke FAILED: ${failure} ===`);
     if (page) {

@@ -442,3 +442,71 @@ func TestEnvBootstrapDoesNotOverwrite(t *testing.T) {
 		t.Fatal("bootstrap password should not work")
 	}
 }
+
+func FuzzCookieSecurity(f *testing.F) {
+	seeds := []string{
+		"127.0.0.1:8756",
+		"127.0.0.1",
+		"localhost:8756",
+		"localhost",
+		"192.168.1.1:443",
+		"example.com:443",
+		"example.com",
+		"[::1]:8756",
+		"[::1]",
+		"bad-host",
+		"",
+		":8756",
+	}
+	for _, s := range seeds {
+		f.Add(s, 0)
+		f.Add(s, -1)
+		f.Add(s, 3600)
+	}
+
+	f.Fuzz(func(t *testing.T, host string, maxAge int) {
+		r, _ := http.NewRequest("GET", "/", nil)
+		r.Host = host
+
+		// Non-TLS request should not panic.
+		cookie := newSessionCookie("test-token", maxAge, r)
+		if cookie.Name != sessionCookieName {
+			t.Errorf("cookie name = %q, want %q", cookie.Name, sessionCookieName)
+		}
+		if cookie.HttpOnly != true {
+			t.Errorf("cookie HttpOnly = %v, want true", cookie.HttpOnly)
+		}
+		if cookie.Path != "/" {
+			t.Errorf("cookie Path = %q, want /", cookie.Path)
+		}
+		if cookie.MaxAge != maxAge {
+			t.Errorf("cookie MaxAge = %d, want %d", cookie.MaxAge, maxAge)
+		}
+		if cookie.Secure && isLoopbackRequest(r) {
+			t.Errorf("cookie Secure=true for loopback request host=%q (expected false)", host)
+		}
+	})
+}
+
+func FuzzIsLoopbackRequest(f *testing.F) {
+	seeds := []string{
+		"127.0.0.1:8756",
+		"127.0.0.1",
+		"[::1]:8756",
+		"[::1]",
+		"localhost:8756",
+		"localhost",
+		"192.168.1.1",
+		"example.com",
+		"",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	f.Fuzz(func(t *testing.T, host string) {
+		r, _ := http.NewRequest("GET", "/", nil)
+		r.Host = host
+		_ = isLoopbackRequest(r)
+	})
+}
