@@ -1,4 +1,4 @@
-# GlyphDeck v0.1.0 release-candidate validation teardown.
+# GlyphDeck v0.1.1 release-candidate validation teardown.
 # Stops only the exact recorded validation binary after PID/path/port verification.
 $ErrorActionPreference = "Stop"
 

@@ -2,6 +2,17 @@
 
 Thanks for considering contributing to GlyphDeck!
 
+## Current Status
+
+External code contributions are temporarily not accepted until contributor terms
+that preserve FireGlyph Studios' commercial relicensing rights are established.
+
+We continue to accept:
+- Bug reports
+- Security vulnerability reports (via [SECURITY.md](SECURITY.md))
+- Feature requests
+- Documentation feedback
+
 ## Getting Started
 
 See [docs/development/LOCAL_DEVELOPMENT.md](docs/development/LOCAL_DEVELOPMENT.md) for
@@ -39,5 +50,6 @@ local development setup instructions.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the
-project's license.
+GlyphDeck is source-available under the PolyForm Noncommercial License 1.0.0.
+Commercial use requires a separate written license from FireGlyph Studios.
+See [LICENSE](../LICENSE) and [COMMERCIAL-LICENSING.md](../COMMERCIAL-LICENSING.md).

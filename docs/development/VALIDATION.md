@@ -27,7 +27,7 @@ The smoke test:
 ### Expected output
 
 ```
-=== v0.1.0 Release Candidate Smoke PASSED ===
+=== v0.1.1 Release Candidate Smoke PASSED ===
 [mvp] Browser smoke PASS (17 fresh screenshots).
 Result: PASS
 ```

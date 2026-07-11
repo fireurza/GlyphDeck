@@ -1,57 +1,64 @@
 # GlyphDeck Release Notes
 
-## v0.1.0 — MVP Release
+## v0.1.1 — First Supported MVP Release
 
-GlyphDeck v0.1.0 is the first usable, local-first web workspace for managing
-OpenCode projects and workflows from a browser UI.
+GlyphDeck v0.1.1 is the first supported public MVP release of a local-first
+web workspace for managing OpenCode projects and workflows from a browser UI.
 
 ### Highlights
 
-- Single Windows release binary serves the embedded React frontend and Go API;
-  Vite is not required at runtime.
-- SQLite stores registered projects and Settings, with migration from the legacy
-  project JSON registry.
-- Project registration, Git status detection, OpenCode discovery, per-project
-  server lifecycle, sessions, prompts, and live SSE transcript streaming.
-- Review, Usage, Agent Terminal, Permissions, User Terminal, and Problems
-  workflows are available from the workspace UI.
-- Browser refresh restores selected project and session state while its OpenCode
-  server remains available.
-- Settings opens from the activity rail as a modal overlay. The bottom dock
-  contains Problems, Agent Terminal, and Terminal.
-- The User Terminal streams output reliably, including the v0.1.0 terminal
-  marker path validated by the release smoke suite.
+- Admin authentication (bcrypt, HttpOnly sessions).
+- Project registry (SQLite-backed) with Git status detection.
+- OpenCode server start/stop/detect (per-project, PID-scoped).
+- Session management, prompt, live SSE transcript streaming.
+- Review, Usage, Agent Terminal, Permissions, User Terminal, Problems panels.
+- Servers/Sandboxes: local, manual URL, and SSH alias targets.
+- Remote SSH lifecycle: test, detect, start, stop (PID-scoped, no blanket kill).
+- Windows ConPTY terminal support.
+- Single release binary with embedded React/Vite frontend.
+- CI/CD: Verify (Go + Node), CodeQL, Dependency Review, OpenSSF Scorecard.
+- Source-available under PolyForm Noncommercial License 1.0.0.
+- Commercial use requires a separate written license from FireGlyph Studios.
+
+### Supported Platforms
+
+| Platform | Binary |
+|----------|--------|
+| Linux amd64 | `glyphdeck-linux-amd64` |
+| macOS amd64 | `glyphdeck-darwin-amd64` |
+| macOS arm64 (Apple Silicon) | `glyphdeck-darwin-arm64` |
+| Windows amd64 | `glyphdeck-windows-amd64.exe` |
+
+### Security Model
+
+- Admin authentication required (bcrypt password, HttpOnly session cookie).
+- Binds to `127.0.0.1` (loopback) by default.
+- Mutating API requests require same-origin `Origin` and loopback host.
+- Not designed for public internet exposure without additional auth and TLS.
 
 ### Build and Run
 
-On Windows, build the release binary from the repository root:
-
 ```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1
+.\scripts\build.ps1
 .\dist\glyphdeck.exe
 ```
 
-GlyphDeck listens on `http://127.0.0.1:8756`. See the
-[README](../README.md) for prerequisites, local development, and validation
-commands.
+GlyphDeck listens on `http://127.0.0.1:8756`. See the [README](../README.md).
 
-### Validation
+### Artifact Verification
 
-The accepted release candidate was validated from the embedded
-`dist\glyphdeck.exe` binary with isolated app data. The release smoke suite
-checks the homepage, project/server/session lifecycle, Settings modal,
-terminal open/close flow and marker output, Problems happy path, shutdown, and
-embedded frontend loading outside the repository root.
+```bash
+# Verify checksum
+sha256sum -c checksums.txt --ignore-missing
+
+# Verify attestation (requires gh CLI)
+gh attestation verify dist/glyphdeck-windows-amd64.exe --repo fireurza/GlyphDeck
+```
 
 ### Known Limitations
 
-- GlyphDeck is localhost-only and has no authentication. Do not expose it to a
-  LAN or public network.
-- On Windows, the User Terminal uses `exec.Command` pipes rather than a true
-  PTY. TTY resize and terminal signals are unavailable.
-- App-owned OpenCode servers and terminals intentionally stop when GlyphDeck
-  shuts down; restart them after backend restart.
-- Sessions are supplied by the running OpenCode server and are not cached in
-  SQLite. Reload sessions after the server is available.
-- There is no installer. Build the binary and perform manual local setup.
-- Usage remains unavailable until OpenCode supplies usage fields.
+- Designed for single-user, local-machine use.
+- No multi-user or role-based access control.
+- Remote agent/skill/MCP sync not yet implemented.
+- No built-in TLS — add a reverse proxy if needed.
+- Single admin account only.
