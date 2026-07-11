@@ -1,283 +1,152 @@
 # GlyphDeck
 
-GlyphDeck is a local-first web workspace for managing projects, detecting OpenCode, running per-project OpenCode servers, streaming transcripts, reviewing changes, tracking usage, handling permissions, and using an interactive terminal — all from a browser UI.
+A local-first web workspace for managing [OpenCode](https://opencode.ai) projects,
+servers, sessions, and terminals — all from a browser UI.
 
-## Accepted Capabilities (M0-M14)
+[![Verify](https://github.com/fireurza/GlyphDeck/actions/workflows/verify.yml/badge.svg)](https://github.com/fireurza/GlyphDeck/actions/workflows/verify.yml)
 
-| Milestone | Feature | Status |
-|---|---|---|
-| M0 | Repo bootstrap (Go backend + React/Vite shell) | Accepted |
-| M1 | Project registry (add/list/delete, JSON persistence, Git detection) | Accepted |
-| M2 | OpenCode server manager (detect/start/stop, health check, port allocation) | Accepted |
-| M3 | Sessions and prompt loop (create/list, send prompt, view transcript) | Accepted |
-| M3.5 | Validation harness hardening (data-testid, dev endpoints, controlled scripts) | Accepted |
-| M4 | EventBridge streaming (SSE from OpenCode to browser, live transcript) | Accepted |
-| M5 | Agent Terminal (read-only tool/event history, category filters) | Accepted |
-| M6 | Usage tab (token/cost aggregation, available/unavailable states) | Accepted |
-| M7 | Review tab (project/Git/session/activity summary) | Accepted |
-| M8 | Permissions (approval popup with once/always/reject) | Accepted |
-| M9 | User Terminal (interactive shell in project cwd) | Accepted |
-| M10 | POC hardening (browser refresh, problems tab, graceful shutdown, docs) | Accepted |
-| M11 | SQLite project persistence and JSON migration | Accepted |
-| M12 | Browser-refresh and intentional-stop state cleanup | Accepted |
-| M13 | SQLite-backed Settings and release build plumbing | Accepted |
-| M14 | Reliable terminal SSE marker streaming | Accepted |
+## What It Does
 
-## v0.1.0 Release
+- Manage multiple OpenCode project directories.
+- Start, stop, and attach to local or remote OpenCode servers.
+- Create sessions, send prompts, and view transcripts in real time.
+- Review per-project Git status, token usage, and activity summaries.
+- Handle OpenCode permissions (approve/reject/always).
+- Run an interactive terminal in the project working directory.
+- Secured by admin authentication and localhost-only binding.
 
-See [docs/agent/MVP_V0_1_0_PLAN.md](docs/agent/MVP_V0_1_0_PLAN.md) for the full MVP plan.
+## Screenshots
 
-The accepted MVP release candidate (`6778e4a`) serves the React build from
-`glyphdeck.exe`, uses SQLite for projects and Settings, and has a fresh
-isolated MVP smoke suite. Settings opens from the activity rail as a modal
-overlay; the bottom dock contains only Problems, Agent Terminal, and Terminal.
-See [v0.1.0 release notes](docs/RELEASE_NOTES.md) for functionality,
-validation coverage, and known limitations.
+<!-- TODO: add screenshots of primary views -->
 
-## Prerequisites
+## Features
 
-- [Go](https://go.dev/dl/) 1.23+
-- [Node.js](https://nodejs.org/) 20+ with npm
-- [OpenCode](https://opencode.ai) CLI (`opencode` on PATH)
-- [Git](https://git-scm.com/)
-- [PowerShell 7](https://github.com/PowerShell/PowerShell) (for validation scripts on Windows)
+| Feature | Status |
+|---------|--------|
+| Project registry (SQLite-backed) | ✅ |
+| OpenCode server start/stop/detect (per-project, PID-scoped) | ✅ |
+| Session list, create, prompt, transcript (SSE live) | ✅ |
+| Review panel (Git, project, session, activity summary) | ✅ |
+| Usage panel (token/cost aggregation) | ✅ |
+| Agent Terminal (tool call history) | ✅ |
+| User Terminal (interactive shell in project cwd) | ✅ |
+| Permissions (once/always/reject popup) | ✅ |
+| Admin authentication (bcrypt, HttpOnly sessions) | ✅ |
+| Servers/Sandboxes (local, manual URL, SSH alias targets) | ✅ |
+| Remote SSH lifecycle (detect, start, stop — PID-scoped) | ✅ |
+| Windows ConPTY terminal support | ✅ |
+| Release build (single binary with embedded React frontend) | ✅ |
+| CI/CD (verify, CodeQL, Dependabot) | ✅ |
 
-OpenCode server communication uses HTTP Basic Auth credentials from environment variables:
+## Requirements
+
+- **Go** 1.23+ (to build from source)
+- **Node.js** 22+ with npm (to build the frontend)
+- **OpenCode** CLI installed and on PATH
+- **Git** (optional; enables per-project Git status)
+- **PowerShell 7** (Windows; required for validation scripts)
+
+OpenCode server communication uses HTTP Basic Auth credentials from environment:
 
 - `OPENCODE_SERVER_USERNAME` (default: `opencode`)
 - `OPENCODE_SERVER_PASSWORD` (set by OpenCode Desktop)
 
-These must be available in the environment where GlyphDeck's backend runs.
+## Quick Start
 
-### Admin Authentication
-
-GlyphDeck requires admin authentication to protect API and frontend access:
-
-- **First run:** If no admin is configured, the UI shows a setup screen to create an admin password.
-- **Login:** After setup, the login screen requires the admin password.
-- **Session:** Login sets an HttpOnly cookie; the session persists until the browser closes or the user logs out.
-- **Logout:** Click the door icon (🚪) in the left rail.
-- **Unauthenticated requests** to protected `/api/*` routes return `401`.
-
-**Environment bootstrap:**
-
-Set `GLYPHDECK_ADMIN_PASSWORD` before starting GlyphDeck to create an admin
-on first startup without interactive setup:
+### From source
 
 ```powershell
-$env:GLYPHDECK_ADMIN_PASSWORD = "your-password"
-go run ./cmd/glyphdeck
-```
+# Clone and build
+git clone https://github.com/fireurza/GlyphDeck.git
+cd GlyphDeck
 
-The password is bcrypt-hashed and stored in SQLite. The raw password is never
-logged. Bootstrap runs only when no admin credential exists; existing admins
-are not overwritten.
-
-## Run Locally
-
-Shell: PowerShell 7
-Working directory: project root
-
-**Backend:**
-
-```powershell
-npm.cmd --prefix web run build
-go run ./cmd/glyphdeck
-```
-
-Starts on `http://127.0.0.1:8756`. Health check at `/healthz`.
-
-**Frontend:**
-
-```powershell
-npm.cmd --prefix web install
-npm.cmd --prefix web run dev
-```
-
-Starts Vite dev server (default: `http://localhost:5173`).
-
-### Release binary
-
-```powershell
+# Build frontend + Go binary
 pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\build.ps1
+
+# Run
 .\dist\glyphdeck.exe
 ```
 
-The binary listens on `http://127.0.0.1:8756` and does not require a `web/dist`
-directory beside its working directory after it has been built.
+Open `http://127.0.0.1:8756` in your browser.
+
+### Release binary
+
+Download `glyphdeck.exe` from [releases](https://github.com/fireurza/GlyphDeck/releases).
+Run it directly — the frontend is embedded. No separate `dist/` or `node_modules/` needed.
+
+## First-Run Setup
+
+On first launch, GlyphDeck shows a setup screen to create an admin password.
+The password is bcrypt-hashed and stored in a local SQLite database.
+
+### Headless bootstrap
+
+Set `GLYPHDECK_ADMIN_PASSWORD` before starting to skip interactive setup:
+
+```powershell
+$env:GLYPHDECK_ADMIN_PASSWORD = "your-password"
+.\dist\glyphdeck.exe
+```
+
+The password is never logged. Bootstrap runs only when no admin exists.
+
+## Servers & Sandboxes
+
+GlyphDeck supports three server target types:
+
+| Type | Description |
+|------|------------|
+| **Local** | Start an OpenCode server on your machine (PID-scoped, stops only that instance) |
+| **Manual URL** | Attach to any OpenCode server by URL |
+| **SSH Alias** | Connect to a remote OpenCode server via SSH config alias |
+
+Remote SSH operations are PID-scoped — start captures the remote PID, stop
+verifies PID ownership before killing. Blanket `pkill` is never used.
+
+## Security Model
+
+GlyphDeck v0.1.0 is designed for **local use**.
+
+- Binds to `127.0.0.1` (loopback) by default.
+- Mutating API requests require same-origin `Origin` and loopback host.
+- Admin auth required for all API access (bcrypt + HttpOnly cookies).
+- **Not designed for public internet exposure.** Add a reverse proxy with TLS
+  and additional auth layers if remote access is needed.
+
+See [SECURITY.md](SECURITY.md) for details and vulnerability reporting.
 
 ## Validation
 
-### Quick validation
+Run the full validation suite:
 
 ```powershell
-npm.cmd --prefix web run build
 go test ./... -count=1
-go vet ./cmd/... ./internal/... ./web
+go vet ./cmd/... ./internal/... ./web/...
+cd web && npm test && npm run build
+.\scripts\build.ps1
+.\scripts\validation\run-mvp-smoke.ps1
+npm.cmd --prefix web audit --audit-level=high
 ```
 
-### Full release-candidate smoke test (v0.1.0)
-
-```powershell
-pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\run-mvp-smoke.ps1
-```
-
-All validation artifacts are stored under `.glyphdeck/validation/<milestone>/` (git-ignored):
-
-```
-.glyphdeck/validation/mvp/
-├── logs/
-├── screenshots/
-├── scripts/
-├── pids/
-├── data/
-├── launch/
-└── workspace/
-```
-
-## API Reference
-
-### Project Registry
-
-- `GET /api/projects` — list registered projects.
-- `POST /api/projects` — add a local project path.
-- `GET /api/projects/{projectId}` — get one registered project.
-- `DELETE /api/projects/{projectId}` — remove one registered project.
-
-### OpenCode Server
-
-- `GET /api/opencode` — detect OpenCode CLI and version.
-- `GET /api/projects/{projectId}/server` — get server status.
-- `POST /api/projects/{projectId}/server/start` — start an OpenCode server.
-- `POST /api/projects/{projectId}/server/stop` — stop an OpenCode server.
-
-### Sessions
-
-- `GET /api/projects/{projectId}/sessions` — list OpenCode sessions.
-- `POST /api/projects/{projectId}/sessions` — create a new session.
-- `GET /api/projects/{projectId}/sessions/{sessionId}` — get session details.
-- `GET /api/projects/{projectId}/sessions/{sessionId}/messages` — list messages.
-- `POST /api/projects/{projectId}/sessions/{sessionId}/prompt` — send a prompt.
-
-### Usage
-
-- `GET /api/projects/{projectId}/sessions/{sessionId}/usage` — aggregated token usage and cost.
-
-### Review
-
-- `GET /api/projects/{projectId}/sessions/{sessionId}/review` — project/Git/session/activity summary.
-
-### Permissions
-
-- `GET /api/permissions?projectId={id}` — list pending permission requests.
-- `POST /api/permissions/{requestId}/reply?projectId={id}` — reply once/always/reject.
-
-### User Terminal
-
-- `POST /api/projects/{projectId}/terminals` — start a terminal.
-- `GET /api/terminals/{terminalId}/stream` — SSE output stream.
-- `POST /api/terminals/{terminalId}/input` — send input.
-- `POST /api/terminals/{terminalId}/resize` — resize (no-op on Windows pipes).
-- `POST /api/terminals/{terminalId}/close` — close terminal.
-- `GET /api/terminals/{terminalId}/status` — get terminal status.
-
-### Problems
-
-- `GET /api/problems` — list app-level problems.
-- `POST /api/problems/clear` — clear all problems.
-
-### Events
-
-- `GET /api/events` — SSE event stream from OpenCode to browser.
-
-### Dev/Test (requires `GLYPHDECK_DEV_TOOLS=1`)
-
-- `POST /api/dev/reset-validation-state` — reset validation state.
-- `POST /api/dev/stop-all-app-owned-servers` — stop app-owned servers.
-
-## Manual Smoke Test
-
-Shell: PowerShell 7
-Working directory: project root
-
-1. Build frontend and start backend: `npm.cmd --prefix web run build`; then `go run ./cmd/glyphdeck`
-2. Start frontend in second terminal: `cd web && npm run dev`
-3. Add the current GlyphDeck repo path in the left Projects panel.
-4. Confirm the project appears with Git repo status and branch.
-5. Confirm OpenCode detection banner shows ready with version.
-6. Click Start Server.
-7. Confirm server reaches ready with port and version displayed.
-8. Click the project to select it (sessions list appears, event stream connects).
-9. Click Create Session.
-10. Click the new session to open it in the center panel.
-11. Type a prompt (e.g., "List the validation commands from README.") and click Send.
-12. Confirm the assistant response appears in the transcript.
-13. Open the Agent Terminal tab and confirm live event rows appear.
-14. Open the Usage tab and confirm provider/model/token/cost data appears.
-15. Open the Review tab and confirm project/Git/session/activity data appears.
-16. Force a bash permission rule or use your project config to trigger permission popup; confirm popup appears and can be approved.
-17. Open the Terminal tab, click Start Terminal, send commands, confirm output.
-18. Click Stop Server (no force-click needed).
-19. Confirm server stops.
-20. Open the Problems tab and confirm "No problems detected." is shown.
-21. Refresh the browser and confirm the selected project is restored.
-22. Click the Settings icon in the activity rail, confirm it opens as an overlay above the three-tab dock, save a value, and reopen it.
+The smoke test verifies 17 checks including auth, project/server/session
+lifecycle, terminal child-process cleanup, and visual regression screenshots.
 
 ## Known Limitations
 
-- **Local security boundary.** GlyphDeck accepts only loopback server binds and rejects mutation requests from non-loopback origins. It has no user authentication; do not expose it to public or private networks.
-- **Projects and Settings use SQLite.** The default database is `.glyphdeck/glyphdeck.db`; legacy projects JSON migrates on startup.
-- **No LAN/Tailscale binding.** Only localhost access.
-- **No installer.** Build and run the single binary manually.
-- **Terminal is pipe-based on Windows.** True PTY (ConPTY) is blocked with current Go libraries. The terminal uses `os/exec` with pipes — interactive shell works but no TTY resize, no signals.
-- **Servers and terminals are intentionally stopped at backend shutdown.** GlyphDeck terminates only its tracked process trees; their state is not persisted across a backend restart.
-- **OpenCode owns session state.** Browser selection is restored from local storage, but session lists and messages are reloaded from the running OpenCode server. When that server is unavailable, session operations show an unavailable state instead of using cached session data.
-- **Agent Terminal shows only live activity.** Does not backfill history from before session selection.
-- **Usage tab shows latest assistant message only.** Not per-message or cumulative totals.
-- **Review tab uses local `git` commands for file status.** No OpenCode VCS API integration yet.
-- **Permissions polling is interval-based (2s).** SSE events for live permission updates are available but not yet wired to dismiss popups automatically.
-- **Problems tab tracks up to 100 app-level issues.** Older problems are evicted.
+- Designed for single-user, local-machine use.
+- No multi-user or role-based access control.
+- WebSocket/SSE connections share the same session cookie as HTTP.
+- Remote agent/skill/MCP sync not yet implemented.
+- No built-in TLS — add a reverse proxy if needed.
 
-## Troubleshooting
+## Roadmap
 
-### OpenCode not detected
+See [docs/ROADMAP.md](docs/ROADMAP.md) for planned features and milestones.
 
-```powershell
-opencode --version
-```
+## Contributing
 
-If not found, ensure OpenCode is installed and on PATH.
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
-### Server stuck
+## License
 
-If it was started by the MVP validation harness, run
-`pwsh -NoProfile -ExecutionPolicy Bypass -File .\scripts\validation\stop-dev-mvp.ps1`.
-For a manually started server, stop it from the terminal that launched it (for
-example, `Ctrl+C`) after confirming it is the process you own. Do not kill an
-arbitrary process merely because it owns a common port.
-
-### Event stream offline
-
-1. Ensure the OpenCode server is running (check server status in left panel).
-2. Ensure `OPENCODE_SERVER_PASSWORD` is set in the environment.
-3. Check the Problems tab for any app-level errors.
-
-### Terminal closed/detached after refresh
-
-Terminal sessions are not reattachable after browser refresh. Start a new terminal.
-
-### Validation artifacts
-
-All validation logs, screenshots, PIDs, and workspaces are stored under `.glyphdeck/validation/<milestone>/`. This directory is git-ignored.
-
-## Logs
-
-Backend logs are written to stderr (visible in the terminal running `go run ./cmd/glyphdeck`). Key operations logged:
-
-- Server startup/shutdown
-- OpenCode server start/stop
-- Terminal start/close
-- Permission replies
-- App-level problems
-
-Validation harness logs are stored under `.glyphdeck/validation/<milestone>/logs/`.
+[MIT](LICENSE)
