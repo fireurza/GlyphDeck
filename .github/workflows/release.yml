@@ -88,9 +88,9 @@ jobs:
           sha256sum glyphdeck-* > checksums.txt
 
       - name: Generate SBOM
-        uses: CycloneDX/gh-gomod-generate-sbom@ef4ba5f9a0aa6f1a2a57e4f8736fca7f994ba01e # v2.6.1
-        with:
-          version: "^2"
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod/cmd/cyclonedx-gomod@v2.2.1
+          $(go env GOPATH)/bin/cyclonedx-gomod mod -json -licenses -output dist/cyclonedx-sbom.json -main cmd/glyphdeck
 
       - name: Attest release binaries
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
@@ -103,5 +103,5 @@ jobs:
         with:
           files: |
             dist/*
-            cyclonedx-sbom.json
+            dist/cyclonedx-sbom.json
           generate_release_notes: true
