@@ -1,0 +1,20 @@
+name: Feature Request
+description: Suggest a feature for GlyphDeck
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion! Please describe what you'd like to see.
+  - type: textarea
+    id: description
+    attributes:
+      label: Feature Description
+      description: What should GlyphDeck do?
+    validations:
+      required: true
+  - type: textarea
+    id: use-case
+    attributes:
+      label: Use Case
+      description: How would you use this feature?
