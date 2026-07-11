@@ -91,18 +91,14 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-1. Windows ConPTY is disabled. The implementation exists in
-   `internal/terminal/session_windows.go` but the pipe-based fallback is active
-   because the smoke-test child-process WMI-detection step fails when ConPTY
-   is enabled. This must be resolved before enabling the PTY path.
+None. All tracked pre-v0.1.0 issues are resolved.
 
-## Remote SSH Lifecycle
+### Windows ConPTY
 
-- SSH config aliases are the supported remote identity model (stored in GlyphDeck SQLite).
-- Remote servers can be tested, detected, started, and stopped via SSH.
-- Stop is PID-scoped: only the recorded PID is killed; blanket `pkill opencode` is never used.
-- Start captures PID and URL; stop verifies PID belongs to OpenCode before killing.
-- Remote sync of agents/plugins/skills/MCP/code-standards remains future work.
+Enabled. The terminal uses `CreatePseudoConsole` via `golang.org/x/sys/windows` for true
+PTY support. Child-process detection and cleanup use the Job Object (`QueryInformationJobObject`)
+rather than external WMI enumeration. Smoke validation passes 17/17 including terminal marker,
+child-process startup/cleanup, and cwd display.
 
 ## First-Run Admin Auth
 

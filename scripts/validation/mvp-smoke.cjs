@@ -5,7 +5,6 @@
  * execution, so every generated artifact stays in the milestone directory.
  */
 const { chromium } = require('playwright');
-const { execFileSync } = require('child_process');
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
@@ -47,21 +46,6 @@ function isProcessAlive(pid) {
     return true;
   } catch (error) {
     return error?.code === 'EPERM';
-  }
-}
-
-function findNodeProcessPID(marker) {
-  const escapedMarker = marker.replace(/'/g, "''");
-  const command = `Get-CimInstance Win32_Process | Where-Object { $_.Name -ieq 'node.exe' -and $_.CommandLine -like '*${escapedMarker}*' } | Select-Object -First 1 -ExpandProperty ProcessId`;
-  try {
-    const output = execFileSync('powershell.exe', ['-NoProfile', '-Command', command], {
-      encoding: 'utf8',
-      windowsHide: true,
-    }).trim();
-    const pid = Number(output);
-    return Number.isInteger(pid) && pid > 0 ? pid : undefined;
-  } catch {
-    return undefined;
   }
 }
 
@@ -367,6 +351,8 @@ async function run() {
     fail('validation terminal start did not return a terminal ID');
   }
   validationTerminalID = createdTerminal.id;
+  const terminalShellPID = createdTerminal.shellPid;
+  if (!terminalShellPID) fail('terminal start did not report a shell PID');
   recordCheck('validation terminal ID tracked for cleanup');
   await waitUntil(async () => (
     ((await page.getByTestId('user-terminal-status').textContent()) || '').includes('Running')
@@ -386,9 +372,18 @@ async function run() {
   await page.getByTestId('user-terminal-input').fill(childCommand);
   await page.getByTestId('user-terminal-input').press('Enter');
   let childPID;
-  await waitUntil(() => {
-    childPID = findNodeProcessPID(childMarker);
-    return Boolean(childPID);
+  await waitUntil(async () => {
+    // Query the terminal status for child PIDs from the Job Object.
+    const status = await apiGet(`/api/terminals/${encodeURIComponent(validationTerminalID)}/status`);
+    const pids = status.childPids || [];
+    // Find a node.exe PID that is NOT the shell PID.
+    for (const pid of pids) {
+      if (pid !== terminalShellPID) {
+        childPID = pid;
+        return true;
+      }
+    }
+    return false;
   }, 'terminal child process started', 15000);
   if (!childPID) fail('terminal child process did not report a valid PID');
   recordCheck('terminal child process PID tracked');

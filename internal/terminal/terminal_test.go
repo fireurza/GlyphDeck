@@ -13,6 +13,8 @@ func (m *mockProcessTree) Close() error {
 	return nil
 }
 
+func (m *mockProcessTree) PIDs() []int { return nil }
+
 func TestCloseTerminatesTrackedProcess(t *testing.T) {
 	tree := &mockProcessTree{}
 	mgr := &Manager{

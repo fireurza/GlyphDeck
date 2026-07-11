@@ -71,3 +71,41 @@ func (tree *windowsProcessTree) Close() error {
 	}
 	return nil
 }
+
+// PIDs returns the process IDs of all members currently in the Job Object.
+func (tree *windowsProcessTree) PIDs() []int {
+	if tree == nil || tree.job == 0 || tree.job == windows.InvalidHandle {
+		return nil
+	}
+	const infoClass uint32 = 3 // JobObjectBasicProcessIdList
+	buf := make([]byte, 4096)
+	var retlen uint32
+	err := windows.QueryInformationJobObject(
+		tree.job,
+		int32(infoClass),
+		uintptr(unsafe.Pointer(&buf[0])),
+		uint32(len(buf)),
+		&retlen,
+	)
+	if err != nil {
+		return nil
+	}
+	if len(buf) < 4 || retlen < 4 {
+		return nil
+	}
+	count := *(*uint32)(unsafe.Pointer(&buf[0]))
+	if count == 0 {
+		return nil
+	}
+	pids := make([]int, 0, count)
+	const pidOffset = 4
+	const pidSize = 8
+	for i := uint32(0); i < count && int(pidOffset+i*pidSize+pidSize) <= len(buf); i++ {
+		ptr := unsafe.Pointer(&buf[pidOffset+i*pidSize])
+		pid := int(*(*uintptr)(ptr))
+		if pid > 0 {
+			pids = append(pids, pid)
+		}
+	}
+	return pids
+}

@@ -89,7 +89,23 @@ try {
   $env:GLYPHDECK_DATA_DIR = $dataDir
   $env:GLYPHDECK_DEV_TOOLS = "1"
   $env:GLYPHDECK_ADMIN_PASSWORD = "mvp-smoke-admin-pass"
-  $process = Start-Process -FilePath $binaryPath -WorkingDirectory $launchDir -WindowStyle Hidden -PassThru -RedirectStandardOutput $backendLog -RedirectStandardError $backendErrorLog
+
+  $psi = New-Object System.Diagnostics.ProcessStartInfo
+  $psi.FileName = $binaryPath
+  $psi.WorkingDirectory = $launchDir
+  $psi.UseShellExecute = $false
+  $psi.CreateNoWindow = $true
+  $psi.WindowStyle = [System.Diagnostics.ProcessWindowStyle]::Hidden
+  $psi.RedirectStandardOutput = $true
+  $psi.RedirectStandardError = $true
+  $p = New-Object System.Diagnostics.Process
+  $p.StartInfo = $psi
+  $p.Start() | Out-Null
+
+  # Capture stdout/stderr to log files.
+  $stdoutJob = Start-Job -ScriptBlock { param($reader, $path) $reader.BaseStream.CopyTo([System.IO.File]::OpenWrite($path)) } -ArgumentList $p.StandardOutput, $backendLog
+  $stderrJob = Start-Job -ScriptBlock { param($reader, $path) $reader.BaseStream.CopyTo([System.IO.File]::OpenWrite($path)) } -ArgumentList $p.StandardError, $backendErrorLog
+  $process = $p
 } finally {
   $env:GLYPHDECK_PORT = $oldPort
   $env:GLYPHDECK_DATA_DIR = $oldDataDir
