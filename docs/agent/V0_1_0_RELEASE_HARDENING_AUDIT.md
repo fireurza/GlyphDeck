@@ -91,15 +91,19 @@ repository permissions.
 
 ## Remaining Release Limitations
 
-1. No auth / first-run admin setup is missing. GlyphDeck has no user authentication;
-   the loopback-only boundary is not a substitute for authentication.
-
-2. OpenCode server/sandbox lifecycle is incomplete. The foundation (server configs,
-   attach/detach, status check, state clearing) is implemented. Remaining work:
+1. OpenCode server/sandbox lifecycle is incomplete. The foundation (server configs,
+   attach/detach, status check) is implemented. Remaining work:
    - Remote SSH detect/start/stop (SSH config aliases stored, endpoints not yet built).
    - Remote agent/skill/MCP sync (future feature, not planned for v0.1.0).
 
-3. Windows ConPTY is disabled. The implementation exists in
+2. Windows ConPTY is disabled. The implementation exists in
    `internal/terminal/session_windows.go` but the pipe-based fallback is active
    because the smoke-test child-process WMI-detection step fails when ConPTY
    is enabled. This must be resolved before enabling the PTY path.
+
+## First-Run Admin Auth
+
+- First-run setup: if no admin exists, the UI shows a setup screen.
+- Login: admin password is bcrypt-hashed, sessions use HttpOnly cookies.
+- Bootstrap: `GLYPHDECK_ADMIN_PASSWORD` env var creates admin on startup if none exists.
+- Same-origin/loopback guards remain as defense-in-depth.
