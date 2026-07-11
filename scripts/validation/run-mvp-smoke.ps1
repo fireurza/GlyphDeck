@@ -64,6 +64,49 @@ foreach ($validationPath in @(
   Assert-NoValidationReparsePoints $validationPath
 }
 
+$monitorLog = Assert-ValidationPath (Join-Path $logDir "visible-window-monitor.log")
+
+# Snapshot forbidden process names visible before smoke.
+$forbiddenNames = @("cmd", "powershell", "pwsh", "WindowsTerminal", "wt", "notepad", "explorer", "chrome", "msedge", "chromium", "msedgewebview2")
+$visibleBefore = @{}
+foreach ($name in $forbiddenNames) {
+  Get-Process -Name $name -ErrorAction SilentlyContinue | ForEach-Object {
+    $visibleBefore[$_.Id] = $name
+  }
+}
+
+# Visible-window monitor runs as a background job during smoke.
+$monitorJob = Start-Job -Name "glyphdeck-window-monitor" -ArgumentList $monitorLog, $forbiddenNames, $visibleBefore -ScriptBlock {
+  param($logPath, $names, $beforeSnapshot)
+  $startTime = Get-Date
+  $found = @()
+  while ($true) {
+    Start-Sleep -Milliseconds 200
+    foreach ($name in $names) {
+      $procs = Get-Process -Name $name -ErrorAction SilentlyContinue
+      foreach ($proc in $procs) {
+        if (-not $beforeSnapshot.ContainsKey($proc.Id)) {
+          # New process detected. Check if it has a visible window.
+          $hasWindow = $false
+          try { if ($proc.MainWindowHandle -ne 0) { $hasWindow = $true } } catch {}
+          if ($hasWindow) {
+            $entry = "[{0:HH:mm:ss}] NEW VISIBLE WINDOW: PID={1} Name={2} Title='{3}'" -f (Get-Date), $proc.Id, $proc.ProcessName, $proc.MainWindowTitle
+            $found += $entry
+            Add-Content -LiteralPath $logPath -Value $entry
+          }
+        }
+      }
+    }
+    # Stop when the monitor file is deleted by the runner.
+    if (-not (Test-Path -LiteralPath $logPath)) { break }
+  }
+  if ($found.Count -eq 0) {
+    Add-Content -LiteralPath $logPath -Value "No new visible windows detected."
+  }
+}
+$monitorPidPath = Assert-ValidationPath (Join-Path $pidDir "visible-monitor.pid")
+$monitorJob.Id | Out-File -LiteralPath $monitorPidPath -NoNewline -Encoding ASCII
+
 $notepadBefore = @(
   Get-Process -Name "notepad" -ErrorAction SilentlyContinue |
     Select-Object -ExpandProperty Id
@@ -119,10 +162,26 @@ try {
   Write-Host "[mvp] Browser smoke FAIL: $($_.Exception.Message)"
   $exitCode = 1
 } finally {
+  # Stop visible-window monitor.
+  if ($monitorJob) {
+    $monitorJob | Stop-Job -ErrorAction SilentlyContinue
+    $monitorJob | Remove-Job -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $monitorLog -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath $monitorPidPath -Force -ErrorAction SilentlyContinue
+  }
+
   try {
     & (Join-Path $scriptDir "stop-dev-mvp.ps1")
   } catch {
     Write-Host "[mvp] Teardown FAIL: $($_.Exception.Message)"
+    $exitCode = 1
+  }
+
+  # Check visible-window monitor results.
+  $monitorResults = Receive-Job -Name "glyphdeck-window-monitor" -ErrorAction SilentlyContinue
+  if ($monitorResults -and $monitorResults -match "NEW VISIBLE WINDOW") {
+    Write-Host "[guard] FORBIDDEN VISIBLE WINDOW DETECTED:"
+    Write-Host $monitorResults
     $exitCode = 1
   }
 
