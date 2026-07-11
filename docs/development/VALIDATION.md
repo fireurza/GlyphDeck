@@ -51,3 +51,18 @@ All validation artifacts live under `.glyphdeck/validation/<milestone>/`:
 - `scripts/` — copied smoke scripts
 
 Artifacts are excluded from Git via `.gitignore`.
+
+## Artifact Verification
+
+Release binaries are signed with GitHub Artifact Attestations and include
+SHA-256 checksums and a CycloneDX SBOM.
+
+Verify a downloaded binary:
+
+```powershell
+# Verify the checksum
+shasum -a 256 -c checksums.txt --ignore-missing
+
+# Verify the attestation (requires gh CLI)
+gh attestation verify dist/glyphdeck-windows-amd64.exe --repo fireurza/GlyphDeck
+```

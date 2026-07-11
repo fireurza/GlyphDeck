@@ -42,10 +42,10 @@ func newTermSession(shellPath string, shellArgs []string, cwd string) (termSessi
 	return &pipeSession{cmd: cmd, stdinW: stdinPipe, stdoutR: stdoutPipe}, nil
 }
 
-func (s *pipeSession) stdin() io.WriteCloser  { return s.stdinW }
-func (s *pipeSession) stdout() io.ReadCloser  { return s.stdoutR }
+func (s *pipeSession) stdin() io.WriteCloser    { return s.stdinW }
+func (s *pipeSession) stdout() io.ReadCloser    { return s.stdoutR }
 func (s *pipeSession) resize(_, _ uint16) error { return nil }
-func (s *pipeSession) process() *os.Process   { return s.cmd.Process }
+func (s *pipeSession) process() *os.Process     { return s.cmd.Process }
 
 func (s *pipeSession) wait() error {
 	return s.cmd.Wait()

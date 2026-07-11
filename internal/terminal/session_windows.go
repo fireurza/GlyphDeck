@@ -47,14 +47,14 @@ func (r *pipeReader) Close() error { return windows.CloseHandle(r.h) }
 
 // conPTYSession backs a terminal with a Windows Pseudo Console (ConPTY).
 type conPTYSession struct {
-	hpc       windows.Handle
-	attrList  *windows.ProcThreadAttributeListContainer
-	hproc     windows.Handle
-	proc      *os.Process
-	inWrite   *pipeWriter
-	outRead   *pipeReader
-	waitOnce  sync.Once
-	waitDone  bool
+	hpc      windows.Handle
+	attrList *windows.ProcThreadAttributeListContainer
+	hproc    windows.Handle
+	proc     *os.Process
+	inWrite  *pipeWriter
+	outRead  *pipeReader
+	waitOnce sync.Once
+	waitDone bool
 }
 
 func newTermSession(shellPath string, shellArgs []string, cwd string) (termSession, error) {
