@@ -44,14 +44,14 @@ type Message struct {
 
 // MessageInfo carries metadata about a message.
 type MessageInfo struct {
-	ID         string      `json:"id"`
-	Role       string      `json:"role"`
-	ProviderID string      `json:"providerID,omitempty"`
-	ModelID    string      `json:"modelID,omitempty"`
-	Agent      string      `json:"agent,omitempty"`
-	Mode       string      `json:"mode,omitempty"`
-	Cost       float64     `json:"cost,omitempty"`
-	Tokens     TokenUsage  `json:"tokens,omitempty"`
+	ID         string     `json:"id"`
+	Role       string     `json:"role"`
+	ProviderID string     `json:"providerID,omitempty"`
+	ModelID    string     `json:"modelID,omitempty"`
+	Agent      string     `json:"agent,omitempty"`
+	Mode       string     `json:"mode,omitempty"`
+	Cost       float64    `json:"cost,omitempty"`
+	Tokens     TokenUsage `json:"tokens,omitempty"`
 }
 
 // TokenUsage captures token breakdown from assistant messages.

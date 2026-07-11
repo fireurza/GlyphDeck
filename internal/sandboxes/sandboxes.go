@@ -21,11 +21,11 @@ const (
 
 // ServerConfig is a persisted OpenCode server target.
 type ServerConfig struct {
-	ID        string     `json:"id"`
-	Name      string     `json:"name"`
-	Type      ServerType `json:"type"`
-	URL       string     `json:"url"`
-	SSHAlias  string     `json:"sshAlias"`
+	ID       string     `json:"id"`
+	Name     string     `json:"name"`
+	Type     ServerType `json:"type"`
+	URL      string     `json:"url"`
+	SSHAlias string     `json:"sshAlias"`
 
 	// Remote lifecycle fields (SSH targets).
 	WorkingDir   string `json:"workingDir"`
@@ -84,7 +84,7 @@ var ErrPIDMismatch = errors.New("PID does not belong to an OpenCode process")
 
 // Registry persists and retrieves OpenCode server configurations and remote lifecycle state.
 type Registry struct {
-	db       *sql.DB
+	db        *sql.DB
 	sshRunner SSHRunner
 }
 
