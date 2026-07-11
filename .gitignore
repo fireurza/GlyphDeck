@@ -63,5 +63,11 @@ go.work
 # CortexKit
 .cortexkit/
 
+# Codex
+.codex/
+
+# Internal agent planning and workflow material
+docs/agent/
+
 # OS
 Desktop.ini
