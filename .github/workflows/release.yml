@@ -102,7 +102,8 @@ jobs:
           cat checksums.txt
 
       - name: Generate SBOM
-        uses: CycloneDX/gh-gomod-generate-sbom@efc74245d6802c8cefd925620515442756c70d8f # v2.0.0
+        run: mkdir -p dist
+      - uses: CycloneDX/gh-gomod-generate-sbom@efc74245d6802c8cefd925620515442756c70d8f # v2.0.0
         with:
           version: v1
           args: mod -licenses -json -output "dist/glyphdeck-${{ env.RELEASE_TAG }}.cdx.json"
