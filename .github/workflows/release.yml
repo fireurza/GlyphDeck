@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - "v*"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -92,9 +93,10 @@ jobs:
           cat checksums.txt
 
       - name: Generate SBOM
-        run: |
-          go install github.com/CycloneDX/cyclonedx-gomod@v2.0.0
-          cyclonedx-gomod mod -licenses -json -output "dist/glyphdeck-${{ github.ref_name }}.cdx.json"
+        uses: CycloneDX/gh-gomod-generate-sbom@efb74210fb404f88c57e22b9ba6a69f2a969b1ee # v2.0.0
+        with:
+          version: v1
+          args: mod -licenses -json -output "dist/glyphdeck-${{ github.ref_name }}.cdx.json"
 
       - name: Attest provenance for release binaries
         id: attest-provenance
