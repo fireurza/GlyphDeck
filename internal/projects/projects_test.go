@@ -315,3 +315,87 @@ func newTestRegistry(t *testing.T) *Registry {
 	}
 	return registry
 }
+
+func FuzzNormalizePath(f *testing.F) {
+	seeds := []string{
+		"/tmp/valid",
+		"C:\\Windows\\Temp",
+		".",
+		"",
+		"../escape",
+		"..\\..\\escape",
+		"/etc/passwd",
+		"\\\\server\\share",
+		"C:relative",
+		"/valid/path/.",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	f.Fuzz(func(t *testing.T, raw string) {
+		result, err := normalizePath(raw)
+		if err != nil {
+			return // rejected paths are expected behavior
+		}
+		if result == "" {
+			t.Errorf("normalizePath returned empty string and nil error for input %q", raw)
+		}
+		if filepath.Clean(result) != result {
+			t.Errorf("normalizePath returned non-clean path %q for input %q", result, raw)
+		}
+		if strings.Contains(result, "..") {
+			t.Errorf("normalizePath returned path with .. component: %q (input: %q)", result, raw)
+		}
+	})
+}
+
+func FuzzIsWindowsNetworkPath(f *testing.F) {
+	seeds := []string{
+		`\\server\share`,
+		`//server/share`,
+		`\/server/share`,
+		`/\\server/share`,
+		"C:\\",
+		"normal",
+		"",
+		"\\\\",
+		"\\a",
+		"//",
+		"/\\",
+	}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	f.Fuzz(func(t *testing.T, raw string) {
+		result := isWindowsNetworkPath(raw)
+		if result && len(raw) < 2 {
+			t.Errorf("isWindowsNetworkPath returned true for short input %q", raw)
+		}
+	})
+}
+
+func FuzzDetectGit(f *testing.F) {
+	seeds := []string{"main", "", "feature/branch", "release/v1.0"}
+	for _, s := range seeds {
+		f.Add(s)
+	}
+
+	f.Fuzz(func(t *testing.T, branch string) {
+		projectDir := t.TempDir()
+		gitDir := filepath.Join(projectDir, ".git")
+		if err := os.Mkdir(gitDir, 0o755); err != nil {
+			t.Skip()
+		}
+		headContent := "ref: refs/heads/" + branch + "\n"
+		if err := os.WriteFile(filepath.Join(gitDir, "HEAD"), []byte(headContent), 0o644); err != nil {
+			t.Skip()
+		}
+
+		git := DetectGit(projectDir)
+		if !git.IsRepo {
+			t.Errorf("DetectGit returned IsRepo=false for a valid git repo")
+		}
+	})
+}

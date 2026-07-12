@@ -1,0 +1,4 @@
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+ignoreUntil = 2026-10-11
+reason = "GlyphDeck imports golang.org/x/crypto/bcrypt for password hashing only. The openpgp subpackage (affected by GO-2026-5932) is never imported or reached by any GlyphDeck code. Dependency path: glyphdeck/internal/auth -> golang.org/x/crypto/bcrypt. No OpenPGP symbols are used."

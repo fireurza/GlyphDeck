@@ -291,7 +291,10 @@ func boolToInt(b bool) int {
 }
 
 func DetectGit(projectPath string) GitInfo {
-	headPath := filepath.Join(projectPath, ".git", "HEAD")
+	headPath, err := safeJoinGitPath(projectPath, "HEAD")
+	if err != nil {
+		return GitInfo{IsRepo: false, Branch: ""}
+	}
 	content, err := os.ReadFile(headPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return GitInfo{IsRepo: false, Branch: ""}
@@ -309,14 +312,49 @@ func DetectGit(projectPath string) GitInfo {
 	return GitInfo{IsRepo: true, Branch: branch}
 }
 
+func safeJoinGitPath(projectRoot, subpath string) (string, error) {
+	cleanRoot := filepath.Clean(projectRoot)
+	joined := filepath.Join(cleanRoot, ".git", subpath)
+	clean := filepath.Clean(joined)
+
+	resolvedRoot, err := filepath.EvalSymlinks(cleanRoot)
+	if err != nil {
+		return "", fmt.Errorf("resolve project root: %w", err)
+	}
+	resolvedResult, err := filepath.EvalSymlinks(clean)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return clean, nil
+		}
+		return "", fmt.Errorf("resolve git path: %w", err)
+	}
+
+	rel, err := filepath.Rel(resolvedRoot, resolvedResult)
+	if err != nil {
+		return "", fmt.Errorf("path escapes project root")
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("path escapes project root")
+	}
+	return clean, nil
+}
+
 // normalizePath validates and normalizes a project directory path.
 func normalizePath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", ErrMissingPath
 	}
-	if runtime.GOOS == "windows" && isWindowsNetworkPath(trimmed) {
+	if !filepath.IsAbs(trimmed) {
 		return "", ErrUnsupportedPath
+	}
+	if runtime.GOOS == "windows" {
+		if isWindowsNetworkPath(trimmed) {
+			return "", ErrUnsupportedPath
+		}
+		if isWindowsDriveRelative(trimmed) {
+			return "", ErrUnsupportedPath
+		}
 	}
 
 	evaluated, err := filepath.EvalSymlinks(trimmed)
@@ -329,7 +367,12 @@ func normalizePath(raw string) (string, error) {
 		return "", ErrUnsupportedPath
 	}
 
-	info, err := os.Stat(abs)
+	return safeStatDir(abs)
+}
+
+func safeStatDir(path string) (string, error) {
+	clean := filepath.Clean(path)
+	info, err := os.Stat(clean)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return "", ErrPathNotFound
@@ -339,8 +382,7 @@ func normalizePath(raw string) (string, error) {
 	if !info.IsDir() {
 		return "", ErrPathNotDirectory
 	}
-
-	return abs, nil
+	return clean, nil
 }
 
 func isWindowsNetworkPath(path string) bool {
@@ -352,6 +394,23 @@ func isWindowsNetworkPath(path string) bool {
 
 func isWindowsPathSeparator(character byte) bool {
 	return character == '\\' || character == '/'
+}
+
+func isWindowsDriveRelative(path string) bool {
+	if len(path) < 2 {
+		return false
+	}
+	letter := path[0]
+	if !((letter >= 'A' && letter <= 'Z') || (letter >= 'a' && letter <= 'z')) {
+		return false
+	}
+	if path[1] != ':' {
+		return false
+	}
+	if len(path) == 2 {
+		return false
+	}
+	return !isWindowsPathSeparator(path[2])
 }
 
 // nextID generates a stable project ID from name and path.

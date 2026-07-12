@@ -5,12 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"glyphdeck/internal/lifecycle"
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
+
+	"glyphdeck/internal/lifecycle"
 )
 
 // Terminal represents a running interactive shell session.
@@ -65,6 +68,79 @@ func NewManager(resolver ProjectResolver) *Manager {
 	}
 }
 
+func resolveAndValidateCWD(ctx context.Context, resolver ProjectResolver, projectID, cwd string) (string, error) {
+	if resolver == nil {
+		return "", fmt.Errorf("terminal requires a registered project")
+	}
+
+	projectRoot, err := resolver.GetPath(ctx, projectID)
+	if err != nil {
+		return "", fmt.Errorf("resolve project root: %w", err)
+	}
+
+	if !isContained(projectRoot, cwd) {
+		return "", fmt.Errorf("cwd is not within the project root")
+	}
+
+	cleanCwd, err := filepath.EvalSymlinks(filepath.Clean(cwd))
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("resolve cwd: %w", err)
+		}
+		cleanCwd = filepath.Clean(cwd)
+	}
+
+	if _, err := os.Stat(cleanCwd); err != nil {
+		return "", fmt.Errorf("cwd does not exist: %w", err)
+	}
+	return cleanCwd, nil
+}
+
+func isContained(root, child string) bool {
+	cleanRoot := filepath.Clean(root)
+	cleanChild := filepath.Clean(child)
+
+	rootResolved, rootErr := filepath.EvalSymlinks(cleanRoot)
+	childResolved, childErr := filepath.EvalSymlinks(cleanChild)
+
+	if rootErr == nil && childErr != nil {
+		rel, relErr := filepath.Rel(cleanRoot, cleanChild)
+		if relErr == nil && !strings.HasPrefix(rel, "..") {
+			childResolved = filepath.Join(rootResolved, rel)
+		} else {
+			childResolved = cleanChild
+		}
+	} else if rootErr != nil || childErr != nil {
+		rootResolved = cleanRoot
+		childResolved = cleanChild
+	}
+
+	volRoot := filepath.VolumeName(rootResolved)
+	volChild := filepath.VolumeName(childResolved)
+	if !strings.EqualFold(volRoot, volChild) {
+		return false
+	}
+
+	rel, err := filepath.Rel(rootResolved, childResolved)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+	if rel == ".." {
+		return false
+	}
+	if strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	return true
+}
+
+func pathIsDescendant(root, child string) bool {
+	return isContained(root, child)
+}
+
 // detectShell returns the shell path and args for the current platform.
 func detectShell() (string, []string) {
 	if _, err := exec.LookPath("pwsh.exe"); err == nil {
@@ -93,11 +169,13 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 	if cwd == "" {
 		return nil, fmt.Errorf("cwd is required")
 	}
-	if _, err := os.Stat(cwd); err != nil {
-		return nil, fmt.Errorf("cwd does not exist: %w", err)
+
+	cleanCwd, err := resolveAndValidateCWD(ctx, m.resolver, projectID, cwd)
+	if err != nil {
+		return nil, fmt.Errorf("validate cwd: %w", err)
 	}
 
-	session, err := newTermSession(m.shellPath, m.shellArgs, cwd)
+	session, err := newTermSession(m.shellPath, m.shellArgs, cleanCwd)
 	if err != nil {
 		return nil, fmt.Errorf("start shell: %w", err)
 	}
@@ -117,7 +195,7 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 	term := &Terminal{
 		ID:          id,
 		ProjectID:   projectID,
-		Cwd:         cwd,
+		Cwd:         cleanCwd,
 		session:     session,
 		processTree: processTree,
 		createdAt:   time.Now(),
@@ -139,7 +217,7 @@ func (m *Manager) Start(ctx context.Context, projectID, cwd string) (*Status, er
 		ID:        id,
 		ProjectID: projectID,
 		Running:   true,
-		Cwd:       cwd,
+		Cwd:       cleanCwd,
 		Shell:     m.shellPath,
 		ShellPID:  session.process().Pid,
 		CreatedAt: term.createdAt.Format(time.RFC3339),

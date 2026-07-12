@@ -2,16 +2,35 @@
 
 Thanks for considering contributing to GlyphDeck!
 
+## Contributor Terms
+
+By submitting code, documentation, or any other Contribution to this project,
+you agree to the [GlyphDeck Contributor Terms](CONTRIBUTOR_TERMS.md). Before
+opening a pull request, you must confirm acceptance by checking the declaration
+in the pull request template.
+
+External code contributions require explicit acceptance of the Contributor
+Terms. Pull requests from contributors who have not accepted these terms will
+not be merged.
+
 ## Current Status
 
-External code contributions are temporarily not accepted until contributor terms
-that preserve FireGlyph Studios' commercial relicensing rights are established.
+External code contributions are accepted. Contributions will not be merged
+without explicit acceptance of the [GlyphDeck Contributor Terms](CONTRIBUTOR_TERMS.md).
+Contributors retain ownership of their contributions while granting the rights
+described in the Contributor Terms.
 
 We continue to accept:
 - Bug reports
 - Security vulnerability reports (via [SECURITY.md](SECURITY.md))
 - Feature requests
 - Documentation feedback
+
+## Code of Conduct
+
+This project follows the [Contributor Covenant Code of Conduct](CODE_OF_CONDUCT.md).
+Please review it before participating. Reports may be sent to the contact
+listed in the Code of Conduct.
 
 ## Getting Started
 
@@ -52,4 +71,4 @@ local development setup instructions.
 
 GlyphDeck is source-available under the PolyForm Noncommercial License 1.0.0.
 Commercial use requires a separate written license from FireGlyph Studios.
-See [LICENSE](../LICENSE) and [COMMERCIAL-LICENSING.md](../COMMERCIAL-LICENSING.md).
+See [LICENSE](LICENSE) and [COMMERCIAL-LICENSING.md](COMMERCIAL-LICENSING.md).

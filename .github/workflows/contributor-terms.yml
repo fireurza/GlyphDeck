@@ -1,0 +1,36 @@
+name: Contributor Terms
+
+on:
+  pull_request:
+    branches: [master]
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Contributor Terms
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify contributor terms accepted
+        run: |
+          BODY=$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")
+
+          ACCEPTED=$(echo "$BODY" | grep -c '\- \[[xX]\] I have read and agree to the GlyphDeck Contributor Terms and confirm that I am authorized to submit this contribution.' || true)
+
+          if [ "$ACCEPTED" -ge 1 ]; then
+            echo "Contributor terms accepted"
+          else
+            echo "ERROR: Contributor terms declaration is missing or unchecked."
+            echo "Please check the box in the PR description:"
+            echo "- [ ] I have read and agree to the GlyphDeck Contributor Terms and confirm that I am authorized to submit this contribution."
+            exit 1
+          fi

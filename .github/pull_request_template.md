@@ -1,28 +1,21 @@
 ## Summary
 
-<!-- What does this PR do? -->
+<!-- Describe what this PR changes and why. -->
 
-## Type
+## Validation
 
-- [ ] Bug fix
-- [ ] Feature
-- [ ] Chore
-- [ ] Docs
-
-## Testing
-
-<!-- How was this tested? Include commands and evidence. -->
-
-## Screenshots
-
-<!-- If UI changes, include before/after screenshots. -->
+<!-- Checklist of tests and verifications run. -->
 
 ## Checklist
 
-- [ ] `go test ./... -count=1` passes
-- [ ] `go vet ./cmd/... ./internal/... ./web/...` passes
-- [ ] `npm test` passes (`cd web && npm test`)
-- [ ] `npm run build` passes (`cd web && npm run build`)
-- [ ] `.\scripts\build.ps1` passes
-- [ ] `.\scripts\validation\run-mvp-smoke.ps1` passes (17/17)
-- [ ] No visible host windows opened
+- [ ] I have read and agree to the GlyphDeck Contributor Terms and confirm that I am authorized to submit this contribution.
+- [ ] All tests pass locally.
+- [ ] Go vet is clean.
+- [ ] MVP smoke passes (17/17).
+- [ ] No visible host windows during validation.
+- [ ] No secrets, DBs, logs, or build artifacts are staged.
+- [ ] Documentation updated if behavior changed.
+
+## Notes
+
+<!-- Any additional context for reviewers. -->
