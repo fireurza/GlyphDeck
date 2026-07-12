@@ -1,4 +1,4 @@
-# GlyphDeck v0.1.1 release-candidate validation runner.
+# GlyphDeck v0.1.2 release-candidate validation runner.
 # All generated state remains under .glyphdeck\validation\mvp.
 $ErrorActionPreference = "Stop"
 

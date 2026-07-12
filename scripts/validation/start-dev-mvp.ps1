@@ -1,4 +1,4 @@
-# GlyphDeck v0.1.1 release-candidate validation startup.
+# GlyphDeck v0.1.2 release-candidate validation startup.
 # Starts only a tracked, isolated release binary; never reuses or kills a port owner.
 $ErrorActionPreference = "Stop"
 
