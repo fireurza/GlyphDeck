@@ -107,7 +107,7 @@ verifies PID ownership before killing. Blanket `pkill` is never used.
 
 ## Security Model
 
-GlyphDeck v0.1.1 is designed for **local use**.
+GlyphDeck v0.1.2 is designed for **local use**.
 
 - Binds to `127.0.0.1` (loopback) by default.
 - Mutating API requests require same-origin `Origin` and loopback host.

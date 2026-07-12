@@ -83,30 +83,49 @@ jobs:
       - name: Generate checksums
         run: |
           cd dist
-          sha256sum glyphdeck-* > checksums.txt
-
-      - name: Attest release binaries
-        id: attest
-        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
-        with:
-          subject-path: dist/*
-
-      - name: Copy attestation bundle
-        run: |
-          TAG="${GITHUB_REF#refs/tags/}"
-          cp "${{ steps.attest.outputs.bundle-path }}" "dist/glyphdeck-${TAG}.sigstore.json"
+          sha256sum \
+            glyphdeck-linux-amd64 \
+            glyphdeck-darwin-amd64 \
+            glyphdeck-darwin-arm64 \
+            glyphdeck-windows-amd64.exe \
+            > checksums.txt
+          cat checksums.txt
 
       - name: Generate SBOM
-        uses: CycloneDX/gh-gomod-generate-sbom@efb74210fb404f88c57e22b9ba6a69f2a969b1ee # v2.0.0
-        with:
-          version: v1
-          args: mod -licenses -json -output dist/glyphdeck-${{ github.ref_name }}.cdx.json
+        run: |
+          go install github.com/CycloneDX/cyclonedx-gomod@v2.0.0
+          cyclonedx-gomod mod -licenses -json -output "dist/glyphdeck-${{ github.ref_name }}.cdx.json"
 
-      - name: Attest SBOM
+      - name: Attest provenance for release binaries
+        id: attest-provenance
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
-          subject-path: dist/glyphdeck-${{ github.ref_name }}.cdx.json
-          predicate-type: https://spdx.dev/Document
+          subject-checksums: dist/checksums.txt
+
+      - name: Copy provenance bundle
+        run: |
+          BUNDLE="${{ steps.attest-provenance.outputs.bundle-path }}"
+          if [ ! -f "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "Provenance bundle is missing or empty"
+            exit 1
+          fi
+          cp "$BUNDLE" "dist/glyphdeck-${{ github.ref_name }}.provenance.sigstore.json"
+
+      - name: Attest SBOM for release binaries
+        id: attest-sbom
+        uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
+        with:
+          subject-checksums: dist/checksums.txt
+          sbom-path: "dist/glyphdeck-${{ github.ref_name }}.cdx.json"
+
+      - name: Copy SBOM bundle
+        run: |
+          BUNDLE="${{ steps.attest-sbom.outputs.bundle-path }}"
+          if [ ! -f "$BUNDLE" ] || [ ! -s "$BUNDLE" ]; then
+            echo "SBOM bundle is missing or empty"
+            exit 1
+          fi
+          cp "$BUNDLE" "dist/glyphdeck-${{ github.ref_name }}.sbom.sigstore.json"
 
       - name: Create Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
