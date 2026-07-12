@@ -148,6 +148,8 @@ See [docs/ROADMAP.md](docs/ROADMAP.md) for planned features and milestones.
 ## Contributing
 
 Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTOR_TERMS.md](CONTRIBUTOR_TERMS.md) for the contributor license grant
+and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community standards.
 
 ## License
 

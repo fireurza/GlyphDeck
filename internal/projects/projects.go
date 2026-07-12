@@ -329,9 +329,11 @@ func safeJoinGitPath(projectRoot, subpath string) (string, error) {
 		return "", fmt.Errorf("resolve git path: %w", err)
 	}
 
-	rootStr := filepath.ToSlash(resolvedRoot)
-	resultStr := filepath.ToSlash(resolvedResult)
-	if !strings.HasPrefix(resultStr, rootStr+"/") && resultStr != rootStr {
+	rel, err := filepath.Rel(resolvedRoot, resolvedResult)
+	if err != nil {
+		return "", fmt.Errorf("path escapes project root")
+	}
+	if rel == ".." || strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
 		return "", fmt.Errorf("path escapes project root")
 	}
 	return clean, nil
@@ -342,6 +344,9 @@ func normalizePath(raw string) (string, error) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
 		return "", ErrMissingPath
+	}
+	if !filepath.IsAbs(trimmed) {
+		return "", ErrUnsupportedPath
 	}
 	if runtime.GOOS == "windows" {
 		if isWindowsNetworkPath(trimmed) {

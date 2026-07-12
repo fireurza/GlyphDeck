@@ -69,19 +69,8 @@ func NewManager(resolver ProjectResolver) *Manager {
 }
 
 func resolveAndValidateCWD(ctx context.Context, resolver ProjectResolver, projectID, cwd string) (string, error) {
-	cleanCwd := filepath.Clean(cwd)
-	var err error
-	cleanCwd, err = filepath.EvalSymlinks(cleanCwd)
-	if err != nil {
-		return "", fmt.Errorf("resolve cwd: %w", err)
-	}
-
 	if resolver == nil {
-		cleanCwd = filepath.Clean(cleanCwd)
-		if _, err := os.Stat(cleanCwd); err != nil {
-			return "", fmt.Errorf("cwd does not exist: %w", err)
-		}
-		return cleanCwd, nil
+		return "", fmt.Errorf("terminal requires a registered project")
 	}
 
 	projectRoot, err := resolver.GetPath(ctx, projectID)
@@ -89,34 +78,67 @@ func resolveAndValidateCWD(ctx context.Context, resolver ProjectResolver, projec
 		return "", fmt.Errorf("resolve project root: %w", err)
 	}
 
-	cleanRoot, err := filepath.EvalSymlinks(filepath.Clean(projectRoot))
-	if err != nil {
-		return "", fmt.Errorf("resolve project root: %w", err)
-	}
-
-	if !pathIsDescendant(cleanRoot, cleanCwd) {
+	if !isContained(projectRoot, cwd) {
 		return "", fmt.Errorf("cwd is not within the project root")
 	}
 
-	cleanCwd = filepath.Clean(cleanCwd)
+	cleanCwd, err := filepath.EvalSymlinks(filepath.Clean(cwd))
+	if err != nil {
+		if !errors.Is(err, os.ErrNotExist) {
+			return "", fmt.Errorf("resolve cwd: %w", err)
+		}
+		cleanCwd = filepath.Clean(cwd)
+	}
+
 	if _, err := os.Stat(cleanCwd); err != nil {
 		return "", fmt.Errorf("cwd does not exist: %w", err)
 	}
 	return cleanCwd, nil
 }
 
-func pathIsDescendant(root, child string) bool {
-	rootSlash := filepath.ToSlash(root)
-	childSlash := filepath.ToSlash(child)
+func isContained(root, child string) bool {
+	cleanRoot := filepath.Clean(root)
+	cleanChild := filepath.Clean(child)
 
-	if rootSlash == childSlash {
-		return true
+	rootResolved, rootErr := filepath.EvalSymlinks(cleanRoot)
+	childResolved, childErr := filepath.EvalSymlinks(cleanChild)
+
+	if rootErr == nil && childErr != nil {
+		rel, relErr := filepath.Rel(cleanRoot, cleanChild)
+		if relErr == nil && !strings.HasPrefix(rel, "..") {
+			childResolved = filepath.Join(rootResolved, rel)
+		} else {
+			childResolved = cleanChild
+		}
+	} else if rootErr != nil || childErr != nil {
+		rootResolved = cleanRoot
+		childResolved = cleanChild
 	}
-	if !strings.HasPrefix(childSlash, rootSlash+"/") {
+
+	volRoot := filepath.VolumeName(rootResolved)
+	volChild := filepath.VolumeName(childResolved)
+	if !strings.EqualFold(volRoot, volChild) {
 		return false
 	}
-	remaining := childSlash[len(rootSlash)+1:]
-	return remaining != "" && !strings.Contains(remaining, "..")
+
+	rel, err := filepath.Rel(rootResolved, childResolved)
+	if err != nil {
+		return false
+	}
+	if rel == "." {
+		return true
+	}
+	if rel == ".." {
+		return false
+	}
+	if strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+		return false
+	}
+	return true
+}
+
+func pathIsDescendant(root, child string) bool {
+	return isContained(root, child)
 }
 
 // detectShell returns the shell path and args for the current platform.
