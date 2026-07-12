@@ -15,8 +15,10 @@ not be merged.
 
 ## Current Status
 
-External code contributions are temporarily not accepted until contributor terms
-that preserve FireGlyph Studios' commercial relicensing rights are established.
+External code contributions are accepted. Contributions will not be merged
+without explicit acceptance of the [GlyphDeck Contributor Terms](CONTRIBUTOR_TERMS.md).
+Contributors retain ownership of their contributions while granting the rights
+described in the Contributor Terms.
 
 We continue to accept:
 - Bug reports

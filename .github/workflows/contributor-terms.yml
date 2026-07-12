@@ -20,20 +20,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
       - name: Verify contributor terms accepted
         run: |
-          if [ ! -f ".github/pull_request_template.md" ]; then
-            echo "Pull request template not found"
-            exit 1
-          fi
+          BODY=$(jq -r '.pull_request.body // ""' "$GITHUB_EVENT_PATH")
 
-          BODY="${{ github.event.pull_request.body }}"
+          ACCEPTED=$(echo "$BODY" | grep -c '\- \[[xX]\] I have read and agree to the GlyphDeck Contributor Terms and confirm that I am authorized to submit this contribution.' || true)
 
-          if echo "$BODY" | grep -q '\- \[[xX]\] I have read and agree to the GlyphDeck Contributor Terms'; then
+          if [ "$ACCEPTED" -ge 1 ]; then
             echo "Contributor terms accepted"
           else
             echo "ERROR: Contributor terms declaration is missing or unchecked."
