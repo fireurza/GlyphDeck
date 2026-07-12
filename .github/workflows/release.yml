@@ -102,11 +102,10 @@ jobs:
           cat checksums.txt
 
       - name: Generate SBOM
-        run: mkdir -p dist
-      - uses: CycloneDX/gh-gomod-generate-sbom@efc74245d6802c8cefd925620515442756c70d8f # v2.0.0
-        with:
-          version: v1
-          args: mod -licenses -json -output "dist/glyphdeck-${{ env.RELEASE_TAG }}.cdx.json"
+        run: |
+          mkdir -p dist
+          go install github.com/CycloneDX/cyclonedx-gomod@v1.10.0
+          cyclonedx-gomod mod -licenses -json -output "dist/glyphdeck-${{ env.RELEASE_TAG }}.cdx.json"
 
       - name: Attest provenance for release binaries
         id: attest-provenance
