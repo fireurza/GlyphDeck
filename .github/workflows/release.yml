@@ -5,6 +5,11 @@ on:
     tags:
       - "v*"
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Git tag to release (e.g. v0.1.2)"
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,6 +23,7 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
@@ -53,10 +59,13 @@ jobs:
       contents: write
       id-token: write
       attestations: write
+    env:
+      RELEASE_TAG: ${{ inputs.tag || github.ref_name }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
+          ref: ${{ inputs.tag || github.ref }}
 
       - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
         with:
@@ -96,7 +105,7 @@ jobs:
         uses: CycloneDX/gh-gomod-generate-sbom@efb74210fb404f88c57e22b9ba6a69f2a969b1ee # v2.0.0
         with:
           version: v1
-          args: mod -licenses -json -output "dist/glyphdeck-${{ github.ref_name }}.cdx.json"
+          args: mod -licenses -json -output "dist/glyphdeck-${{ env.RELEASE_TAG }}.cdx.json"
 
       - name: Attest provenance for release binaries
         id: attest-provenance
@@ -111,14 +120,14 @@ jobs:
             echo "Provenance bundle is missing or empty"
             exit 1
           fi
-          cp "$BUNDLE" "dist/glyphdeck-${{ github.ref_name }}.provenance.sigstore.json"
+          cp "$BUNDLE" "dist/glyphdeck-${{ env.RELEASE_TAG }}.provenance.sigstore.json"
 
       - name: Attest SBOM for release binaries
         id: attest-sbom
         uses: actions/attest@a1948c3f048ba23858d222213b7c278aabede763 # v4.1.1
         with:
           subject-checksums: dist/checksums.txt
-          sbom-path: "dist/glyphdeck-${{ github.ref_name }}.cdx.json"
+          sbom-path: "dist/glyphdeck-${{ env.RELEASE_TAG }}.cdx.json"
 
       - name: Copy SBOM bundle
         run: |
@@ -127,7 +136,7 @@ jobs:
             echo "SBOM bundle is missing or empty"
             exit 1
           fi
-          cp "$BUNDLE" "dist/glyphdeck-${{ github.ref_name }}.sbom.sigstore.json"
+          cp "$BUNDLE" "dist/glyphdeck-${{ env.RELEASE_TAG }}.sbom.sigstore.json"
 
       - name: Create Release
         uses: softprops/action-gh-release@718ea10b132b3b2eba29c1007bb80653f286566b # v3.0.1
