@@ -1,6 +1,6 @@
 import type { RefObject } from 'react'
 
-export type RailView = 'projects' | 'servers'
+export type RailView = 'projects' | 'servers' | 'mcp' | 'skills' | 'plugins'
 
 interface ActivityRailProps {
   activeView: RailView
@@ -30,6 +30,30 @@ function ActivityRail({ activeView, onSelectView, onOpenSettings, onLogout, sett
           data-testid="activity-servers-button"
         >
           🖥️
+        </button>
+        <button
+          className={`activity-rail__item ${activeView === 'mcp' && !settingsOpen ? 'active' : ''}`}
+          title="MCP Servers"
+          onClick={() => onSelectView('mcp')}
+          data-testid="activity-mcp-button"
+        >
+          🔌
+        </button>
+        <button
+          className={`activity-rail__item ${activeView === 'skills' && !settingsOpen ? 'active' : ''}`}
+          title="Skills"
+          onClick={() => onSelectView('skills')}
+          data-testid="activity-skills-button"
+        >
+          🛠️
+        </button>
+        <button
+          className={`activity-rail__item ${activeView === 'plugins' && !settingsOpen ? 'active' : ''}`}
+          title="Plugins"
+          onClick={() => onSelectView('plugins')}
+          data-testid="activity-plugins-button"
+        >
+          🧩
         </button>
         <button
           ref={settingsButtonRef}

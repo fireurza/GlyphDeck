@@ -10,6 +10,7 @@ import (
 	"glyphdeck/internal/events"
 	"glyphdeck/internal/httpapi"
 	"glyphdeck/internal/opencode"
+	"glyphdeck/internal/opencode/config"
 	"glyphdeck/internal/permissions"
 	"glyphdeck/internal/problems"
 	"glyphdeck/internal/projects"
@@ -28,6 +29,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strings"
 	"syscall"
 	"time"
@@ -145,6 +147,11 @@ func main() {
 
 	// Dev tools — only registered when GLYPHDECK_DEV_TOOLS=1.
 	devtools.RegisterHandlers(mux, registry, manager)
+
+	// OpenCode config inspection (read-only).
+	configRoot := opencodeConfigRoot()
+	configScanner := config.NewScanner(configRoot)
+	config.RegisterHandlers(mux, configScanner, registry)
 
 	// Frontend — serve the compiled React assets embedded in this binary.
 	mux.HandleFunc("/", serveFrontend)
@@ -353,4 +360,19 @@ func serveFrontend(w http.ResponseWriter, r *http.Request) {
 	spaURL.Path = "/"
 	spaRequest.URL = &spaURL
 	server.ServeHTTP(w, spaRequest)
+}
+
+// opencodeConfigRoot returns the global OpenCode configuration directory.
+func opencodeConfigRoot() string {
+	// GLYPHDECK_OPCODE_CONFIG_ROOT override for testing.
+	if root := os.Getenv("GLYPHDECK_OPENCODE_CONFIG_ROOT"); root != "" {
+		return root
+	}
+
+	// OpenCode follows XDG conventions: ~/.config/opencode on all platforms.
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".config", "opencode")
 }

@@ -15,6 +15,9 @@ test('loads settings and shows save success state', async () => {
     .mockResolvedValueOnce(
       jsonResponse({ default_project_dir: 'C:\\Users\\Fireurza\\Documents\\Code' }),
     )
+    .mockResolvedValueOnce(
+      jsonResponse({ available: false, reason: '', sources: [], agents: [], providers: [], models: [], mcpServers: [], skills: [], plugins: [], shellProfiles: [], warnings: [] }),
+    )
     .mockResolvedValueOnce(jsonResponse({ ok: true }))
 
   render(<SettingsPanel />)

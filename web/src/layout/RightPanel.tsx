@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ReviewPanel from './ReviewPanel'
 import UsagePanel from './UsagePanel'
+import AgentsPanel from './AgentsPanel'
 
 const TABS = ['Review', 'Usage', 'Tasks', 'Agents'] as const
 
@@ -35,8 +36,9 @@ function RightPanel({ selectedProjectId, selectedSessionId }: RightPanelProps) {
             selectedSessionId={selectedSessionId}
           />
         )
-      case 'Tasks':
       case 'Agents':
+        return <AgentsPanel selectedProjectId={selectedProjectId} />
+      case 'Tasks':
       default:
         return (
           <div className="panel-body panel-placeholder">

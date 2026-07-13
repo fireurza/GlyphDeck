@@ -3,6 +3,7 @@ import TopBar from './layout/TopBar'
 import ActivityRail, { type RailView } from './layout/ActivityRail'
 import LeftPanel from './layout/LeftPanel'
 import ServersPanel from './layout/ServersPanel'
+import ConfigListPanel from './layout/ConfigListPanel'
 import CenterPanel from './layout/CenterPanel'
 import RightPanel from './layout/RightPanel'
 import BottomPanel from './layout/BottomPanel'
@@ -118,6 +119,14 @@ function App() {
             onSelectProject={handleSelectProject}
             onSelectSession={handleSelectSession}
           />
+        ) : activeRailView === 'servers' ? (
+          <ServersPanel />
+        ) : activeRailView === 'mcp' ? (
+          <ConfigListPanel category="mcpServers" title="MCP Servers" selectedProjectId={selectedProjectId} />
+        ) : activeRailView === 'skills' ? (
+          <ConfigListPanel category="skills" title="Skills" selectedProjectId={selectedProjectId} />
+        ) : activeRailView === 'plugins' ? (
+          <ConfigListPanel category="plugins" title="Plugins" selectedProjectId={selectedProjectId} />
         ) : (
           <ServersPanel />
         )}
