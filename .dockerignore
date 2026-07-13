@@ -1,0 +1,79 @@
+# Git
+.git
+.gitignore
+.github
+
+# GlyphDeck validation and planning
+.glyphdeck
+.cortexkit
+.codex
+.agents
+docs/agent
+
+# Dependencies
+node_modules
+web/node_modules
+
+# Build output
+dist
+web/dist
+glyphdeck.exe
+bin
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Docker
+Dockerfile
+.dockerignore
+compose*.yaml
+docker-compose*.yml
+
+# Databases and logs
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+logs
+screenshots
+
+# Test artifacts
+coverage
+*.coverprofile
+*.test
+*.out
+**/testdata/fuzz
+
+# Quality tools
+.scannerwork
+.sonarlint
+.brooks-lint-history.json
+osv-scanner.toml
+
+# Docs (not needed for build)
+docs
+*.md
+!LICENSE
+!COMMERCIAL-LICENSING.md
+
+# Scripts (not needed for build)
+scripts
+tools
+Makefile
+
+# Go workspace
+go.work

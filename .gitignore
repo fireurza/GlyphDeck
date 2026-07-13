@@ -43,6 +43,9 @@ Thumbs.db
 *.sqlite-wal
 *.sqlite-shm
 
+# Docker secrets (created locally, never committed)
+secrets/
+
 # Local quality-tool artifacts
 .scannerwork/
 .sonarlint/

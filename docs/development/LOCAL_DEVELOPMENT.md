@@ -95,5 +95,111 @@ The application uses a repo-local `.glyphdeck/` directory by default.
 | `GLYPHDECK_DATA_DIR` | Data directory for SQLite | `.glyphdeck/` |
 | `GLYPHDECK_DEV_TOOLS` | Enable dev endpoints (`1` to enable) | (unset) |
 | `GLYPHDECK_ADMIN_PASSWORD` | Bootstrap admin on first start | (unset) |
+| `GLYPHDECK_ADMIN_PASSWORD_FILE` | Path to file containing admin password | (unset) |
+| `GLYPHDECK_CONTAINER_MODE` | Allow `0.0.0.0` bind (`1` to enable) | (unset) |
 | `OPENCODE_SERVER_USERNAME` | OpenCode Basic Auth username | `opencode` |
 | `OPENCODE_SERVER_PASSWORD` | OpenCode Basic Auth password | (required) |
+
+### GLYPHDECK_ADMIN_PASSWORD_FILE
+
+Instead of setting the admin password directly in an environment variable,
+you can store it in a file and point `GLYPHDECK_ADMIN_PASSWORD_FILE` to that
+path. The file is read at startup, trimmed of whitespace, and used to bootstrap
+the admin account. The password value is never logged.
+
+Setting both `GLYPHDECK_ADMIN_PASSWORD` and `GLYPHDECK_ADMIN_PASSWORD_FILE` is
+an error. The application will refuse to start.
+
+### GLYPHDECK_CONTAINER_MODE
+
+When running inside a Docker container, set `GLYPHDECK_CONTAINER_MODE=1`. This
+allows the server to bind `0.0.0.0` internally so the container port is
+reachable from the Docker network. The host publication is still restricted
+to loopback by the Compose port mapping.
+
+Container mode requires `GLYPHDECK_HOST=0.0.0.0`. Any other host value is
+rejected. Outside container mode, only loopback hosts (`127.0.0.1`,
+`localhost`) are accepted.
+
+## Docker Compose Preview
+
+A Docker Compose preview stack is available for evaluation. Docker is **not**
+the primary stable install path yet.
+
+### Prerequisites
+
+- Docker Engine 24+ with Compose plugin
+- Git (to clone the repository)
+
+### Quick start
+
+```powershell
+# Clone the repository
+git clone https://github.com/fireurza/GlyphDeck.git
+cd GlyphDeck
+
+# Create an admin password secret.
+New-Item -ItemType Directory -Force -Path secrets
+Set-Content -Path secrets\glyphdeck_admin_password.txt -Value "your-admin-password" -NoNewline
+
+# Validate and start.
+docker compose -f compose.yaml config
+docker compose -f compose.yaml up -d --wait
+```
+
+Open `http://127.0.0.1:8756`.
+
+### Stopping
+
+```powershell
+docker compose -f compose.yaml down
+```
+
+### Persistence
+
+SQLite app data is stored in the `glyphdeck-app-data` named volume. The
+database survives container recreation and image rebuilds.
+
+Back up the volume:
+
+```powershell
+docker run --rm -v glyphdeck-app-data:/data -v ${PWD}:/backup alpine tar czf /backup/glyphdeck-data-backup.tar.gz -C /data .
+```
+
+### OpenCode targets
+
+The container does **not** bundle OpenCode. Use a Manual URL or SSH Alias
+target to connect to a running OpenCode server on another machine.
+
+SSH targets from Docker require an explicit read-only mount of your SSH
+configuration and key material:
+
+```powershell
+docker compose -f compose.yaml run --rm `
+  -v "$env:USERPROFILE\.ssh:/home/glyphdeck/.ssh:ro" `
+  glyphdeck
+```
+
+This mount is **not enabled by default**.
+
+### Healthcheck
+
+The container runs a healthcheck against `http://localhost:8756/healthz`.
+Healthy status is required before the `--wait` flag returns.
+
+### Security controls
+
+- Non-root container user (`glyphdeck`).
+- All Linux capabilities dropped (`cap_drop: ALL`).
+- `no-new-privileges:true`.
+- Loopback-only host publication (`127.0.0.1:8756`).
+- No Docker socket mount.
+- No privileged mode.
+- Read-only root filesystem (with `tmpfs` for `/tmp`).
+
+### Preview limitations
+
+- Not an isolated multi-user deployment.
+- No built-in TLS — add a reverse proxy if remote access is needed.
+- SSH targets require explicit, user-controlled key mounts.
+- OpenCode is always external.
