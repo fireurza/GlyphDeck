@@ -147,9 +147,9 @@ try {
     Write-Log "Creating test project..."
     $projectId = ""
     try {
-        $projectName = "docker-smoke-test-project"
+        $apiProjectName = "docker-smoke-test-project"
         $projectBody = @{
-            name = $projectName
+            name = $apiProjectName
             path = "/home/glyphdeck"
         } | ConvertTo-Json
         $origin = "http://127.0.0.1:$port"

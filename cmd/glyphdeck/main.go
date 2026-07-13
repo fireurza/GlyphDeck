@@ -298,11 +298,11 @@ func bootstrapAdmin(store *auth.Store) {
 	if passwordFile != "" {
 		data, err := os.ReadFile(passwordFile)
 		if err != nil {
-			log.Fatalf("auth bootstrap: cannot read password file %s: %v", passwordFile, err)
+			log.Fatalf("auth bootstrap: cannot read password file: %v", err)
 		}
 		password = strings.TrimSpace(string(data))
 		if password == "" {
-			log.Fatalf("auth bootstrap: password file %s is empty", passwordFile)
+			log.Fatalf("auth bootstrap: password file is empty")
 		}
 	}
 
