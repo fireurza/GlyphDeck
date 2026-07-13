@@ -108,10 +108,13 @@ function ServersPanel() {
   )
 
   const setState = useCallback((id: string, patch: Partial<TargetState>) => {
-    setTargetStates((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], ...patch, status: prev[id]?.status || 'unknown', op: prev[id]?.op || null, lastError: prev[id]?.lastError || '', lastMsg: prev[id]?.lastMsg || '', lastCheckedAt: prev[id]?.lastCheckedAt || '' },
-    }))
+    setTargetStates((prev) => {
+      const existing = prev[id] || { status: 'unknown', op: null, lastError: '', lastMsg: '', lastCheckedAt: '' }
+      return {
+        ...prev,
+        [id]: { ...existing, ...patch },
+      }
+    })
   }, [])
 
   const loadConfigs = useCallback(async () => {
@@ -451,7 +454,6 @@ function ServersPanel() {
                         id={`edit-name-${cfg.id}`}
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        required
                         data-testid={`edit-name-${cfg.id}`}
                       />
                       {editErrors.name ? <span className="server-form__error">{editErrors.name}</span> : null}
@@ -723,7 +725,7 @@ function ServersPanel() {
             </div>
             <div className="server-form__field">
               <label htmlFor="server-name">Name *</label>
-              <input id="server-name" value={addName} onChange={(e) => setAddName(e.target.value)} required data-testid="server-add-name" />
+              <input id="server-name" value={addName} onChange={(e) => setAddName(e.target.value)} data-testid="server-add-name" />
               {addErrors.name ? <span className="server-form__error">{addErrors.name}</span> : null}
             </div>
             <div className="server-form__field">
