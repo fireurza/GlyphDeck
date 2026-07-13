@@ -63,7 +63,7 @@ function RightPanel({ selectedProjectId, selectedSessionId }: RightPanelProps) {
           </button>
         ))}
       </div>
-      {selectedProjectId ? renderPanel() : (
+      {selectedProjectId || activeTab === 'Agents' ? renderPanel() : (
         <div className="panel-body panel-placeholder">
           <p>No project selected</p>
           <p className="panel-hint">Select a project to view data.</p>

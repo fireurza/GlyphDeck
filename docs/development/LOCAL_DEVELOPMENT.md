@@ -102,6 +102,51 @@ The application uses a repo-local `.glyphdeck/` directory by default.
 | `OPENCODE_SERVER_USERNAME` | OpenCode Basic Auth username | `opencode` |
 | `OPENCODE_SERVER_PASSWORD` | OpenCode Basic Auth password | (required) |
 
+## OpenCode Config Inspection
+
+GlyphDeck provides read-only inspection of OpenCode configuration files for
+OpenCode 1.17.15.
+
+### Configuration locations
+
+| Scope | Path |
+|-------|------|
+| Global | `~/.config/opencode/opencode.jsonc` (preferred) or `.json` |
+| Project | `{project}/.opencode/opencode.jsonc` or `.json` |
+
+Additional directories scanned: `agents/`, `skills/`, `plugins/` under each
+config root.
+
+### Supported formats
+
+- **JSON** (`.json`) — parsed directly.
+- **JSONC** (`.jsonc`) — line and block comments stripped before parsing.
+
+### Trusted-project requirement
+
+Project-level config is only inspected when the project is registered and
+trusted in GlyphDeck. Untrusted projects return a warning and skip project
+config scanning.
+
+### Credential redaction
+
+The following are never returned in the API response or rendered in the UI:
+
+- MCP server headers (e.g., `API_KEY`, `Authorization`)
+- Environment variable values
+- Credential-bearing URLs (user:password@host → `<redacted>@host`)
+- Sensitive command arguments (`--api-key`, `--token`, `--password`)
+- Provider API keys
+
+Environment variable references in config files are **not resolved**.
+
+### Limitations
+
+- Read-only. No configuration writes, sync, or installation.
+- Fields not yet supported: `permission` rules, `compaction` settings, `commands/`,
+  `prompts/`, `scripts/`.
+- Agent definitions in `AGENTS.md` (root file) are not parsed.
+
 ### GLYPHDECK_ADMIN_PASSWORD_FILE
 
 Instead of setting the admin password directly in an environment variable,
