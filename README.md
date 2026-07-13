@@ -105,6 +105,28 @@ GlyphDeck supports three server target types:
 Remote SSH operations are PID-scoped — start captures the remote PID, stop
 verifies PID ownership before killing. Blanket `pkill` is never used.
 
+### Remote SSH targets
+
+Configure an SSH host alias in your local SSH configuration before adding a
+target. GlyphDeck passes that alias to the system `ssh` client; it does not
+store private keys, passwords, or key-file paths.
+
+Open **Servers** from the activity rail, then add or edit an **SSH Alias**
+target. Supply a display name and alias. Optional working-directory, start,
+stop, and status commands are used only for that target's lifecycle actions.
+
+Use **Test SSH** to check the configured alias, **Detect** to refresh remote
+OpenCode status, and **Start** to launch a remote server. A successful start
+records the returned PID and URL. **Attach** selects a known online target for
+GlyphDeck; **Detach** only clears that selection and never stops the remote
+process. **Stop** is available only for an eligible recorded PID and verifies
+the expected remote OpenCode process before stopping that exact PID.
+
+Deleting a target is confirmed in the UI. GlyphDeck warns when the target is
+attached or has a recorded process; deletion never silently stops a remote
+process. For failed SSH actions, verify the alias and remote OpenCode command
+without placing credentials in target fields or issue reports.
+
 ## Security Model
 
 GlyphDeck v0.1.2 is designed for **local use**.

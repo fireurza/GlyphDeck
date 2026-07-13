@@ -374,7 +374,7 @@ function ServersPanel() {
   // ---- Render ----
   if (loading) {
     return (
-      <aside className="left-panel">
+      <aside className="left-panel" data-testid="servers-panel">
         <div className="panel-header">Servers</div>
         <div className="panel-body" data-testid="left-panel-body">
           <p className="project-message">Loading servers…</p>
@@ -389,7 +389,7 @@ function ServersPanel() {
   }
 
   return (
-    <aside className="left-panel">
+    <aside className="left-panel" data-testid="servers-panel">
       <div className="panel-header">Servers</div>
       <div className="panel-body" data-testid="left-panel-body">
         {error ? (
@@ -572,7 +572,7 @@ function ServersPanel() {
                         <h3 className="server-card__name">{cfg.name}</h3>
                         {isActive && (
                           <span className="server-badge server-badge--active" data-testid={`active-badge-${cfg.id}`}>
-                            Active
+                            ✓ Active
                           </span>
                         )}
                         {cfg.startedByGlyphdeck && (
@@ -598,7 +598,7 @@ function ServersPanel() {
                       {/* Error display */}
                       {st.lastError && !st.op && (
                         <p className="server-card__error" role="alert" data-testid={`error-msg-${cfg.id}`}>
-                          {st.lastError}
+                          <span>{st.lastError}</span>
                           <button
                             className="server-btn server-btn--dismiss-error"
                             onClick={() => setState(cfg.id, { lastError: '' })}
