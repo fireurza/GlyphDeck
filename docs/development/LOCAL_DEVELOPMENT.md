@@ -45,6 +45,27 @@ $env:GLYPHDECK_ADMIN_PASSWORD = "dev-password"
 go run ./cmd/glyphdeck
 ```
 
+## Remote SSH target development
+
+GlyphDeck remote targets use an SSH configuration alias already available to
+the local `ssh` client. Configure the alias outside GlyphDeck, then open the
+**Servers** activity-rail view and add an **SSH Alias** target.
+
+The target form stores a display name, SSH alias, and optional remote working
+directory and lifecycle commands. It does not store private keys, passwords,
+or key-file paths.
+
+Use **Test SSH** to validate the alias, **Detect** to refresh remote OpenCode
+status, and **Start** to launch the configured remote command. **Attach**
+selects an online target for the application. **Detach** clears that selection
+only; it does not stop the remote process. **Stop** remains restricted to an
+eligible recorded PID and verifies the remote process before stopping that
+exact PID. The delete confirmation warns about attached targets and recorded
+processes; it never stops a process automatically.
+
+When troubleshooting, report the action and sanitized error text. Do not put
+passwords, private keys, or complete SSH command output in logs or issues.
+
 ### Release binary
 
 ```powershell

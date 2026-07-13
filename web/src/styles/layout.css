@@ -620,9 +620,15 @@
   font-size: var(--font-size-sm);
   color: #e05555;
   margin: 4px 0 0;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: flex-start;
   gap: 4px;
+  overflow-wrap: anywhere;
+}
+
+.server-card__error span {
+  min-width: 0;
 }
 
 .server-card__msg {
@@ -650,8 +656,8 @@
 }
 
 .server-badge--active {
-  background: rgba(74, 154, 74, 0.2);
-  color: #a0d0a0;
+  background: #c1f5c8;
+  color: #14301a;
 }
 
 .server-badge--owned {
@@ -749,7 +755,8 @@
   display: block;
   font-size: var(--font-size-sm);
   color: var(--color-text-muted);
-  margin-bottom: 2px;
+  line-height: 1.2;
+  margin-bottom: 4px;
 }
 
 .server-form__field input,
@@ -776,6 +783,19 @@
   font-size: var(--font-size-xs);
   color: #e05555;
   margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 700px) {
+  .glyphdeck-main:has([data-testid="servers-panel"]) .center-panel,
+  .glyphdeck-main:has([data-testid="servers-panel"]) .right-panel {
+    display: none;
+  }
+
+  .glyphdeck-main:has([data-testid="servers-panel"]) [data-testid="servers-panel"] {
+    width: auto;
+    flex: 1;
+  }
 }
 
 .server-form__actions {

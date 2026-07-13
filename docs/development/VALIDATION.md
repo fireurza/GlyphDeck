@@ -41,6 +41,23 @@ npm.cmd --prefix web run test
 npm.cmd --prefix web run build
 ```
 
+## Remote lifecycle UI validation
+
+After building `dist\glyphdeck.exe`, run the headless remote UI harness:
+
+```powershell
+node .\scripts\validation\server-panel-screenshots.cjs
+```
+
+The harness creates isolated data under
+`.glyphdeck\validation\remote-lifecycle\`, bootstraps an admin with a random
+`GLYPHDECK_ADMIN_PASSWORD`, logs in headlessly, and rejects setup or login
+screens before every retained screenshot. It captures empty, add-form,
+validation, offline, successful SSH-test, online, attached, lifecycle-error,
+protected-delete, and narrow-layout states. SSH lifecycle success and failure
+responses are mocked in the browser so no SSH host, private key, or credential
+is required.
+
 ## Validation Artifacts
 
 All validation artifacts live under `.glyphdeck/validation/<milestone>/`:

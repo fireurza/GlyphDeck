@@ -69,3 +69,9 @@ are the core leaf abstractions (fan-in 10 and 6 respectively).
 - **React + Vite + TypeScript** for the frontend.
 - **Playwright** for browser-based smoke tests.
 - **Embedded frontend** via `embed.FS` in release builds.
+- **Remote targets** use persisted `sandboxes.ServerConfig` records for local,
+  manual URL, and SSH-alias targets. The SSH runner passes aliases as arguments
+  to the system `ssh` client; credentials and private keys are never persisted.
+- **Remote lifecycle ownership** records PID, URL, status, and ownership metadata.
+  Start captures a PID, detach only clears active-target selection, and stop
+  verifies the expected remote process before acting on the exact recorded PID.
