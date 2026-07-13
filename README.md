@@ -41,6 +41,7 @@ servers, sessions, and terminals — all from a browser UI.
 | CI/CD (verify, CodeQL, Dependabot) | ✅ |
 | Docker Compose preview | ✅ |
 | npm launcher preview | ✅ |
+| OpenCode config inspection | ✅ |
 
 ## Requirements
 
