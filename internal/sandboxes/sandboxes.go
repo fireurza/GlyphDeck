@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 )
 
@@ -86,6 +87,8 @@ var ErrPIDMismatch = errors.New("PID does not belong to an OpenCode process")
 type Registry struct {
 	db        *sql.DB
 	sshRunner SSHRunner
+	mu        sync.Mutex
+	ops       map[string]*sync.Mutex // per-target operation locks
 }
 
 // NewRegistry creates a Registry backed by the given database connection.
@@ -93,7 +96,7 @@ func NewRegistry(db *sql.DB) (*Registry, error) {
 	if db == nil {
 		return nil, fmt.Errorf("db is required")
 	}
-	return &Registry{db: db, sshRunner: &realSSHRunner{}}, nil
+	return &Registry{db: db, sshRunner: &realSSHRunner{}, ops: make(map[string]*sync.Mutex)}, nil
 }
 
 // NewRegistryWithSSH creates a Registry with a custom SSH runner (for tests).
@@ -101,7 +104,7 @@ func NewRegistryWithSSH(db *sql.DB, runner SSHRunner) (*Registry, error) {
 	if db == nil {
 		return nil, fmt.Errorf("db is required")
 	}
-	return &Registry{db: db, sshRunner: runner}, nil
+	return &Registry{db: db, sshRunner: runner, ops: make(map[string]*sync.Mutex)}, nil
 }
 
 func scanConfig(row interface{ Scan(dest ...any) error }) (ServerConfig, error) {
@@ -118,6 +121,19 @@ func scanConfig(row interface{ Scan(dest ...any) error }) (ServerConfig, error) 
 	cfg.Type = ServerType(typ)
 	cfg.StartedByGlyphdeck = startedBy == 1
 	return cfg, nil
+}
+
+// lockOp acquires the per-target operation lock, preventing concurrent lifecycle ops.
+func (r *Registry) lockOp(id string) func() {
+	r.mu.Lock()
+	mu, ok := r.ops[id]
+	if !ok {
+		mu = &sync.Mutex{}
+		r.ops[id] = mu
+	}
+	r.mu.Unlock()
+	mu.Lock()
+	return func() { mu.Unlock() }
 }
 
 // Add inserts a new server configuration.
@@ -142,6 +158,60 @@ func (r *Registry) Add(ctx context.Context, cfg ServerConfig) error {
 		startedBy, cfg.CreatedAt, cfg.UpdatedAt,
 	)
 	return err
+}
+
+// Update modifies an existing server configuration. Preserves runtime metadata
+// unless the type or SSH alias changes.
+func (r *Registry) Update(ctx context.Context, cfg ServerConfig) error {
+	existing, err := r.Get(ctx, cfg.ID)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().UTC().Format(time.RFC3339)
+	cfg.UpdatedAt = now
+
+	// Preserve runtime metadata unless identity changes.
+	cfg.LastPID = existing.LastPID
+	cfg.LastURL = existing.LastURL
+	cfg.LastStatus = existing.LastStatus
+	cfg.LastCheckedAt = existing.LastCheckedAt
+	cfg.StartedByGlyphdeck = existing.StartedByGlyphdeck
+	cfg.CreatedAt = existing.CreatedAt
+
+	// Reset runtime metadata when type or SSH alias changes.
+	if cfg.Type != existing.Type || cfg.SSHAlias != existing.SSHAlias {
+		cfg.LastPID = 0
+		cfg.LastURL = ""
+		cfg.LastStatus = ""
+		cfg.LastCheckedAt = ""
+		cfg.StartedByGlyphdeck = false
+	}
+
+	startedBy := 0
+	if cfg.StartedByGlyphdeck {
+		startedBy = 1
+	}
+
+	res, err := r.db.ExecContext(ctx,
+		`UPDATE server_configs SET name=?, type=?, url=?, ssh_alias=?,
+		 working_dir=?, start_command=?, stop_command=?, status_command=?,
+		 last_pid=?, last_url=?, last_status=?, last_checked_at=?, started_by_glyphdeck=?,
+		 updated_at=?
+		 WHERE id=?`,
+		cfg.Name, string(cfg.Type), cfg.URL, cfg.SSHAlias,
+		cfg.WorkingDir, cfg.StartCommand, cfg.StopCommand, cfg.StatusCmd,
+		cfg.LastPID, cfg.LastURL, cfg.LastStatus, cfg.LastCheckedAt, startedBy,
+		cfg.UpdatedAt, cfg.ID,
+	)
+	if err != nil {
+		return err
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
 }
 
 // Get retrieves a single server configuration by ID.
@@ -217,6 +287,9 @@ func (r *Registry) setRuntime(ctx context.Context, id string, pid int, url, stat
 
 // TestSSH verifies that an SSH connection can be established to the given alias.
 func (r *Registry) TestSSH(ctx context.Context, id string) (SSHResult, error) {
+	unlock := r.lockOp(id)
+	defer unlock()
+
 	cfg, err := r.Get(ctx, id)
 	if err != nil {
 		return SSHResult{}, err
@@ -231,6 +304,9 @@ func (r *Registry) TestSSH(ctx context.Context, id string) (SSHResult, error) {
 
 // Detect runs the configured status command (or basic detect) on a remote server.
 func (r *Registry) Detect(ctx context.Context, id string) (RemoteStatus, error) {
+	unlock := r.lockOp(id)
+	defer unlock()
+
 	cfg, err := r.Get(ctx, id)
 	if err != nil {
 		return RemoteStatus{}, err
@@ -272,6 +348,9 @@ func (r *Registry) Detect(ctx context.Context, id string) (RemoteStatus, error) 
 
 // StartRemote starts an OpenCode server on a remote host via SSH.
 func (r *Registry) StartRemote(ctx context.Context, id string) (RemoteResult, error) {
+	unlock := r.lockOp(id)
+	defer unlock()
+
 	cfg, err := r.Get(ctx, id)
 	if err != nil {
 		return RemoteResult{}, err
@@ -309,6 +388,9 @@ func (r *Registry) StartRemote(ctx context.Context, id string) (RemoteResult, er
 
 // StopRemote stops a remote OpenCode server by its recorded PID.
 func (r *Registry) StopRemote(ctx context.Context, id string) (RemoteResult, error) {
+	unlock := r.lockOp(id)
+	defer unlock()
+
 	cfg, err := r.Get(ctx, id)
 	if err != nil {
 		return RemoteResult{}, err

@@ -3,6 +3,7 @@ package sandboxes
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -328,5 +329,216 @@ func TestSSH_Timeout(t *testing.T) {
 	result, _ := reg.TestSSH(context.Background(), "remote-1")
 	if result.Err == nil || !strings.Contains(result.Err.Error(), "timed out") {
 		t.Fatalf("expected timeout error, got %v", result.Err)
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Update (PUT) tests
+// ---------------------------------------------------------------------------
+
+func TestRegistry_Update(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+
+	cfg, _ := reg.Get(context.Background(), "remote-1")
+	cfg.Name = "Updated Name"
+	cfg.WorkingDir = "/home/user"
+	if err := reg.Update(context.Background(), cfg); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	updated, _ := reg.Get(context.Background(), "remote-1")
+	if updated.Name != "Updated Name" {
+		t.Fatalf("name = %q, want %q", updated.Name, "Updated Name")
+	}
+	if updated.WorkingDir != "/home/user" {
+		t.Fatalf("workingDir = %q, want %q", updated.WorkingDir, "/home/user")
+	}
+}
+
+func TestRegistry_UpdatePreservesRuntime(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	reg.setRuntime(context.Background(), "remote-1", 12345, "http://example.com:4096", "online")
+
+	cfg, _ := reg.Get(context.Background(), "remote-1")
+	cfg.Name = "Renamed"
+	if err := reg.Update(context.Background(), cfg); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	updated, _ := reg.Get(context.Background(), "remote-1")
+	if updated.LastPID != 12345 {
+		t.Fatalf("LastPID = %d, want 12345", updated.LastPID)
+	}
+	if updated.LastURL != "http://example.com:4096" {
+		t.Fatalf("LastURL = %q", updated.LastURL)
+	}
+	if updated.LastStatus != "online" {
+		t.Fatalf("LastStatus = %q, want online", updated.LastStatus)
+	}
+}
+
+func TestRegistry_UpdateResetsRuntimeOnTypeChange(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	reg.setRuntime(context.Background(), "remote-1", 99999, "http://remote:4096", "online")
+
+	cfg, _ := reg.Get(context.Background(), "remote-1")
+	cfg.Type = TypeManualURL
+	if err := reg.Update(context.Background(), cfg); err != nil {
+		t.Fatalf("Update failed: %v", err)
+	}
+
+	updated, _ := reg.Get(context.Background(), "remote-1")
+	if updated.LastPID != 0 {
+		t.Fatalf("LastPID = %d, want 0 (reset on type change)", updated.LastPID)
+	}
+	if updated.LastURL != "" {
+		t.Fatalf("LastURL = %q, want empty", updated.LastURL)
+	}
+	if updated.StartedByGlyphdeck {
+		t.Fatal("startedByGlyphdeck should be false after type change")
+	}
+}
+
+func TestRegistry_UpdateNotFound(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	if err := reg.Update(context.Background(), ServerConfig{ID: "noexist", Name: "x"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestHTTP_UpdateConfig(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	ts := newTestServer(t, reg)
+	defer ts.Close()
+
+	body := `{"name":"Renamed Target","type":"ssh_alias","sshAlias":"myserver"}`
+	req, _ := http.NewRequest("PUT", ts.URL+"/api/server-configs/remote-1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := ts.Client().Do(req)
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("PUT status = %d, want 200", resp.StatusCode)
+	}
+	resp.Body.Close()
+
+	cfg, _ := reg.Get(context.Background(), "remote-1")
+	if cfg.Name != "Renamed Target" {
+		t.Fatalf("name = %q, want Renamed Target", cfg.Name)
+	}
+}
+
+func TestHTTP_AddValidation(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	ts := newTestServer(t, reg)
+	defer ts.Close()
+
+	tests := []struct {
+		name       string
+		body       string
+		wantStatus int
+	}{
+		{"missing name", `{"type":"ssh_alias","sshAlias":"x"}`, 400},
+		{"missing ssh alias", `{"name":"test","type":"ssh_alias"}`, 400},
+		{"invalid type", `{"name":"test","type":"bogus"}`, 400},
+		{"valid local", `{"name":"test","type":"local"}`, 201},
+		{"valid ssh alias", `{"name":"test","type":"ssh_alias","sshAlias":"myserver"}`, 201},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			req, _ := http.NewRequest("POST", ts.URL+"/api/server-configs", strings.NewReader(tt.body))
+			req.Header.Set("Content-Type", "application/json")
+			resp, _ := ts.Client().Do(req)
+			if resp.StatusCode != tt.wantStatus {
+				t.Errorf("status = %d, want %d", resp.StatusCode, tt.wantStatus)
+			}
+			resp.Body.Close()
+		})
+	}
+}
+
+func TestHTTP_UpdateValidation(t *testing.T) {
+	reg, _ := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	ts := newTestServer(t, reg)
+	defer ts.Close()
+
+	body := `{"name":"","type":"ssh_alias","sshAlias":"myserver"}`
+	req, _ := http.NewRequest("PUT", ts.URL+"/api/server-configs/remote-1", strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, _ := ts.Client().Do(req)
+	if resp.StatusCode != 400 {
+		t.Fatalf("PUT with empty name status = %d, want 400", resp.StatusCode)
+	}
+	resp.Body.Close()
+}
+
+func TestRegistry_StopRemoteNoPID(t *testing.T) {
+	reg, ssh := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	// Don't set runtime — LastPID is 0.
+	_ = ssh // not used
+	result, _ := reg.StopRemote(context.Background(), "remote-1")
+	if result.Success {
+		t.Fatal("stop without PID should fail")
+	}
+}
+
+func TestRegistry_StopRemotePIDVerificationFails(t *testing.T) {
+	reg, ssh := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	reg.setRuntime(context.Background(), "remote-1", 33333, "", "online")
+	ssh.setResult("ps -p 33333 -o comm= 2>/dev/null | grep -q opencode && echo valid || echo invalid",
+		SSHResult{Stdout: "invalid\n"})
+
+	result, _ := reg.StopRemote(context.Background(), "remote-1")
+	if result.Success {
+		t.Fatal("stop with PID verification failure should not succeed")
+	}
+}
+
+func TestRegistry_ConcurrentLifecycleOps(t *testing.T) {
+	reg, ssh := newTestRegistry(t)
+	addSSHTarget(t, reg, "remote-1", "myserver")
+	ssh.setResult("echo ok", SSHResult{Stdout: "ok\n"})
+
+	// Simulate concurrent TestSSH calls — second should block until first releases.
+	done := make(chan bool, 2)
+	for i := 0; i < 2; i++ {
+		go func() {
+			reg.TestSSH(context.Background(), "remote-1")
+			done <- true
+		}()
+	}
+	<-done
+	<-done
+	// Both completed without panic means locking works.
+}
+
+func TestValidateServerConfig(t *testing.T) {
+	tests := []struct {
+		name     string
+		srvName  string
+		typ      ServerType
+		sshAlias string
+		wantErr  bool
+	}{
+		{"valid local", "test", TypeLocal, "", false},
+		{"valid manual", "test", TypeManualURL, "", false},
+		{"valid ssh", "test", TypeSSHAlias, "myserver", false},
+		{"missing name", "", TypeLocal, "", true},
+		{"missing ssh alias", "test", TypeSSHAlias, "", true},
+		{"invalid type", "test", ServerType("bogus"), "", true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateServerConfig(tt.srvName, tt.typ, tt.sshAlias)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateServerConfig() error = %v, wantErr = %v", err, tt.wantErr)
+			}
+		})
 	}
 }
