@@ -97,6 +97,8 @@ The application uses a repo-local `.glyphdeck/` directory by default.
 | `GLYPHDECK_ADMIN_PASSWORD` | Bootstrap admin on first start | (unset) |
 | `GLYPHDECK_ADMIN_PASSWORD_FILE` | Path to file containing admin password | (unset) |
 | `GLYPHDECK_CONTAINER_MODE` | Allow `0.0.0.0` bind (`1` to enable) | (unset) |
+| `GLYPHDECK_LAUNCHER_RELEASE_TAG` | Override release tag for launcher dev (e.g., `v0.1.2`) | (unset) |
+| `GLYPHDECK_LAUNCHER_CACHE_DIR` | Override launcher cache directory | platform default |
 | `OPENCODE_SERVER_USERNAME` | OpenCode Basic Auth username | `opencode` |
 | `OPENCODE_SERVER_PASSWORD` | OpenCode Basic Auth password | (required) |
 

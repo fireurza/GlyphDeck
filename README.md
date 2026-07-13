@@ -40,6 +40,7 @@ servers, sessions, and terminals — all from a browser UI.
 | Release build (single binary with embedded React frontend) | ✅ |
 | CI/CD (verify, CodeQL, Dependabot) | ✅ |
 | Docker Compose preview | ✅ |
+| npm launcher preview | ✅ |
 
 ## Requirements
 
@@ -76,6 +77,22 @@ Open `http://127.0.0.1:8756` in your browser.
 
 Download `glyphdeck.exe` from [releases](https://github.com/fireurza/GlyphDeck/releases).
 Run it directly — the frontend is embedded. No separate `dist/` or `node_modules/` needed.
+
+### npm launcher preview
+
+**The npm package is not yet published.** The launcher downloads and runs the
+verified release binary from GitHub. Requires Node.js 22+.
+
+```bash
+# Run GlyphDeck (downloads on first use):
+npx @fireglyph/glyphdeck
+
+# Pass arguments through:
+npx @fireglyph/glyphdeck --help
+```
+
+The launcher caches binaries per version and verifies every download against
+`checksums.txt` before execution. See `packages/launcher/README.md` for details.
 
 ### Docker Compose preview
 
