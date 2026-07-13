@@ -33,6 +33,6 @@
   ],
   "author": "FireGlyph Studios",
   "publishConfig": {
-    "access": "restricted"
+    "access": "public"
   }
 }

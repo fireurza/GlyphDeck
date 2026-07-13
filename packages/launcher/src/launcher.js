@@ -1,35 +1,25 @@
 // Core launcher logic — resolves version, downloads, verifies, and runs GlyphDeck.
 
-import { mkdir, readFile, unlink, access } from "node:fs/promises";
-import { open } from "node:fs/promises";
+import { readFile, unlink, stat } from "node:fs/promises";
+import { open, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import { currentAssetName, isSupported, supportedPlatforms } from "./platform.js";
 import { cacheDir, binaryPath, checksumsPath, lockPath } from "./cache.js";
-import { downloadBinary, downloadChecksums, releaseAssetUrl } from "./download.js";
+import { downloadBinary, downloadChecksums } from "./download.js";
 import { parseChecksums, expectedChecksum, verifyChecksum } from "./checksums.js";
 import { execute } from "./execute.js";
 
-/**
- * Reads the version from package.json relative to the given base path.
- */
-function readPackageVersion(packageDir) {
-  // packageDir is the directory containing package.json.
-  // In development, this is packages/launcher/.
-  // In production (npm install), this is the package root.
-  const pkgPath = join(packageDir, "package.json");
-  return readFile(pkgPath, "utf-8").then((data) => {
-    const pkg = JSON.parse(data);
-    return pkg.version;
-  });
-}
+// Fully anchored regex: exactly X.Y.Z or vX.Y.Z, nothing else.
+const STRICT_VERSION_RE = /^v?\d+\.\d+\.\d+$/;
+
+const STALE_LOCK_MS = 5 * 60 * 1000; // 5 minutes
 
 /**
  * Maps a semver version string to a GitHub release tag.
- * Stable versions: X.Y.Z -> vX.Y.Z
+ * Accepts only strict X.Y.Z or vX.Y.Z forms.
  * Development version "0.0.0-development" uses the env override or fails.
  */
 export function versionToTag(version) {
-  // Allow explicit override for development/testing.
   const override = process.env.GLYPHDECK_LAUNCHER_RELEASE_TAG;
   if (override) {
     return validateTag(override);
@@ -42,62 +32,65 @@ export function versionToTag(version) {
     );
   }
 
-  // Strip leading v if present, then re-add.
-  const cleaned = version.replace(/^v/, "");
-  if (!/^\d+\.\d+\.\d+/.test(cleaned)) {
-    throw new Error(`Cannot derive release tag from version: ${version}. Expected semver.`);
+  if (!STRICT_VERSION_RE.test(version)) {
+    throw new Error(
+      `Invalid version format: ${version}. Expected X.Y.Z or vX.Y.Z.`
+    );
   }
 
-  return `v${cleaned}`;
+  // Strip leading v if present, then re-add.
+  return `v${version.replace(/^v/, "")}`;
 }
 
 /**
- * Validates a release tag format.
+ * Validates a release tag. Accepts only exact vX.Y.Z form.
  */
 export function validateTag(tag) {
-  if (!/^v\d+\.\d+\.\d+/.test(tag)) {
-    throw new Error(`Invalid release tag format: ${tag}. Expected vX.Y.Z.`);
+  if (!/^v\d+\.\d+\.\d+$/.test(tag)) {
+    throw new Error(
+      `Invalid release tag format: ${tag}. Expected vX.Y.Z.`
+    );
   }
   return tag;
 }
 
 /**
  * Acquires an exclusive lock file for a cache entry.
- * Uses a lock file with a PID marker. Handles stale locks.
+ * Stores PID and creation timestamp. Handles stale locks (5 minutes).
+ * Returns a release function.
  */
 async function acquireLock(lockFilePath) {
   await mkdir(join(lockFilePath, ".."), { recursive: true });
 
-  for (let attempt = 0; attempt < 30; attempt++) {
+  for (let attempt = 0; attempt < 60; attempt++) {
     try {
       const fd = await open(lockFilePath, "wx");
-      await fd.writeFile(String(process.pid));
+      const meta = JSON.stringify({
+        pid: process.pid,
+        created: Date.now(),
+      });
+      await fd.writeFile(meta);
       await fd.close();
       return async () => {
         try {
-          await unlink(lockFilePath);
+          // Read the lock to verify we own it before releasing.
+          const content = await readFile(lockFilePath, "utf-8");
+          const data = JSON.parse(content);
+          if (data.pid === process.pid) {
+            await unlink(lockFilePath);
+          }
         } catch {
-          // Lock may already be released.
+          try { await unlink(lockFilePath); } catch { /* already gone */ }
         }
       };
     } catch (err) {
       if (err.code === "EEXIST") {
-        // Check if the lock is stale (older than 5 minutes).
-        try {
-          const stat = await readFile(lockFilePath, "utf-8");
-          const lockPid = parseInt(stat, 10);
-          if (isNaN(lockPid) || !isProcessAlive(lockPid)) {
-            // Stale lock — remove and retry.
-            await unlink(lockFilePath);
-            continue;
-          }
-        } catch {
-          // Can't read lock file — remove and retry.
-          try { await unlink(lockFilePath); } catch {}
+        const isStale = await checkStaleLock(lockFilePath);
+        if (isStale) {
+          try { await unlink(lockFilePath); } catch { /* race — ok */ }
           continue;
         }
-
-        // Wait and retry.
+        // Active lock — wait and retry.
         await new Promise((resolve) => setTimeout(resolve, 1000));
       } else {
         throw err;
@@ -105,7 +98,34 @@ async function acquireLock(lockFilePath) {
     }
   }
 
-  throw new Error(`Could not acquire lock after 30 attempts: ${lockFilePath}`);
+  throw new Error(`Could not acquire lock after 60 attempts: ${lockFilePath}`);
+}
+
+/**
+ * Checks if a lock file is stale (malformed, missing PID, or older than 5 minutes).
+ */
+async function checkStaleLock(lockFilePath) {
+  try {
+    const content = await readFile(lockFilePath, "utf-8");
+    const data = JSON.parse(content);
+
+    const lockPid = parseInt(data.pid, 10);
+    if (isNaN(lockPid)) return true; // Malformed — stale.
+
+    // Stale if created more than STALE_LOCK_MS ago.
+    const created = parseInt(data.created, 10);
+    if (!isNaN(created) && Date.now() - created > STALE_LOCK_MS) {
+      return true;
+    }
+
+    // Check if the locking process is still alive.
+    if (!isProcessAlive(lockPid)) return true;
+
+    return false; // Active, valid lock.
+  } catch {
+    // Can't read or parse — treat as stale.
+    return true;
+  }
 }
 
 function isProcessAlive(pid) {
@@ -140,32 +160,35 @@ export async function ensureBinary(version, packageDir) {
 
   try {
     // Check if cached binary already exists and is valid.
-    const isCached = await fileExists(binPath);
-    if (isCached) {
+    // Use stat() directly rather than access-then-read (avoids TOCTOU).
+    let binaryStat;
+    try {
+      binaryStat = await stat(binPath);
+    } catch {
+      binaryStat = null;
+    }
+
+    if (binaryStat && binaryStat.isFile()) {
       try {
         const checksumsContent = await readFile(chkPath, "utf-8");
         const checksums = parseChecksums(checksumsContent);
         const expected = expectedChecksum(checksums, assetName);
         const valid = await verifyChecksum(binPath, expected);
         if (valid) {
-          return binPath; // Cached binary is verified.
+          return binPath;
         }
-        // Corrupt cache — remove and re-download.
         await unlink(binPath);
       } catch {
-        // Checksums file missing or corrupt — re-download everything.
+        // Checksums file missing or corrupt — re-download.
       }
     }
 
-    // Download checksums first, then verify.
     await downloadChecksums(tag, chkPath);
     const checksumsContent = await readFile(chkPath, "utf-8");
     const checksums = parseChecksums(checksumsContent);
 
-    // Download the binary.
     await downloadBinary(tag, assetName, binPath);
 
-    // Verify the downloaded binary.
     const expected = expectedChecksum(checksums, assetName);
     const valid = await verifyChecksum(binPath, expected);
     if (!valid) {
@@ -176,15 +199,6 @@ export async function ensureBinary(version, packageDir) {
     return binPath;
   } finally {
     await releaseLock();
-  }
-}
-
-async function fileExists(path) {
-  try {
-    await access(path);
-    return true;
-  } catch {
-    return false;
   }
 }
 

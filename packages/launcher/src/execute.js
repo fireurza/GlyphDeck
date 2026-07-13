@@ -19,31 +19,37 @@ export function execute(binaryPath, args) {
       env: process.env,
     });
 
-    // Forward signals to the child.
-    const forwardSignal = (signal) => {
+    // Separate handlers for each signal.
+    const onSigint = () => {
       if (child.pid) {
-        try {
-          child.kill(signal);
-        } catch {
-          // Child may already be gone.
-        }
+        try { child.kill("SIGINT"); } catch { /* already gone */ }
       }
     };
 
-    process.on("SIGINT", forwardSignal);
-    process.on("SIGTERM", forwardSignal);
+    const onSigterm = () => {
+      if (child.pid) {
+        try { child.kill("SIGTERM"); } catch { /* already gone */ }
+      }
+    };
+
+    const cleanupHandlers = () => {
+      process.removeListener("SIGINT", onSigint);
+      process.removeListener("SIGTERM", onSigterm);
+    };
+
+    process.on("SIGINT", onSigint);
+    process.on("SIGTERM", onSigterm);
 
     child.on("error", (err) => {
+      cleanupHandlers();
       reject(err);
     });
 
     child.on("close", (code, signal) => {
-      // Clean up signal handlers.
-      process.removeListener("SIGINT", forwardSignal);
-      process.removeListener("SIGTERM", forwardSignal);
+      cleanupHandlers();
 
       if (signal) {
-        // Forward the signal to ourselves so the exit status reflects it.
+        // Child was killed by a signal — forward to self for correct shell behavior.
         process.kill(process.pid, signal);
         return;
       }
