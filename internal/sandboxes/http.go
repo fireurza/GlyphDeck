@@ -3,6 +3,7 @@ package sandboxes
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -24,6 +25,7 @@ func RegisterHandlers(mux *http.ServeMux, registry *Registry) {
 	h := NewHandler(registry)
 	mux.HandleFunc("GET /api/server-configs", h.listConfigs)
 	mux.HandleFunc("POST /api/server-configs", h.addConfig)
+	mux.HandleFunc("PUT /api/server-configs/{id}", h.updateConfig)
 	mux.HandleFunc("DELETE /api/server-configs/{id}", h.deleteConfig)
 	mux.HandleFunc("POST /api/server-configs/{id}/check", h.checkConfig)
 	mux.HandleFunc("POST /api/server-configs/{id}/test-ssh", h.testSSH)
@@ -42,11 +44,15 @@ func (h *Handler) listConfigs(w http.ResponseWriter, r *http.Request) {
 }
 
 type addConfigRequest struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Type     string `json:"type"`
-	URL      string `json:"url"`
-	SSHAlias string `json:"sshAlias"`
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	Type         string `json:"type"`
+	URL          string `json:"url"`
+	SSHAlias     string `json:"sshAlias"`
+	WorkingDir   string `json:"workingDir"`
+	StartCommand string `json:"startCommand"`
+	StopCommand  string `json:"stopCommand"`
+	StatusCmd    string `json:"statusCommand"`
 }
 
 func (h *Handler) addConfig(w http.ResponseWriter, r *http.Request) {
@@ -55,20 +61,27 @@ func (h *Handler) addConfig(w http.ResponseWriter, r *http.Request) {
 		httpapi.WriteError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid JSON.")
 		return
 	}
-	if req.ID == "" || req.Name == "" {
-		httpapi.WriteError(w, http.StatusBadRequest, "invalid_fields", "id and name are required.")
+	if err := validateServerConfig(req.Name, ServerType(req.Type), req.SSHAlias); err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_fields", err.Error())
 		return
 	}
 
 	cfg := ServerConfig{
-		ID:       req.ID,
-		Name:     req.Name,
-		Type:     ServerType(req.Type),
-		URL:      req.URL,
-		SSHAlias: req.SSHAlias,
+		ID:           req.ID,
+		Name:         req.Name,
+		Type:         ServerType(req.Type),
+		URL:          req.URL,
+		SSHAlias:     req.SSHAlias,
+		WorkingDir:   req.WorkingDir,
+		StartCommand: req.StartCommand,
+		StopCommand:  req.StopCommand,
+		StatusCmd:    req.StatusCmd,
 	}
 	if cfg.Type == "" {
 		cfg.Type = TypeLocal
+	}
+	if cfg.ID == "" {
+		cfg.ID = fmt.Sprintf("srv-%d", time.Now().UnixNano())
 	}
 
 	if err := h.registry.Add(r.Context(), cfg); err != nil {
@@ -76,6 +89,41 @@ func (h *Handler) addConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpapi.WriteJSON(w, http.StatusCreated, cfg)
+}
+
+func (h *Handler) updateConfig(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	var req addConfigRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_json", "Request body must be valid JSON.")
+		return
+	}
+	if err := validateServerConfig(req.Name, ServerType(req.Type), req.SSHAlias); err != nil {
+		httpapi.WriteError(w, http.StatusBadRequest, "invalid_fields", err.Error())
+		return
+	}
+
+	cfg := ServerConfig{
+		ID:           id,
+		Name:         req.Name,
+		Type:         ServerType(req.Type),
+		URL:          req.URL,
+		SSHAlias:     req.SSHAlias,
+		WorkingDir:   req.WorkingDir,
+		StartCommand: req.StartCommand,
+		StopCommand:  req.StopCommand,
+		StatusCmd:    req.StatusCmd,
+	}
+
+	if err := h.registry.Update(r.Context(), cfg); err != nil {
+		if errors.Is(err, ErrNotFound) {
+			httpapi.WriteError(w, http.StatusNotFound, "not_found", "Server config not found.")
+			return
+		}
+		httpapi.WriteError(w, http.StatusInternalServerError, "server_configs_error", err.Error())
+		return
+	}
+	httpapi.WriteJSON(w, http.StatusOK, cfg)
 }
 
 func (h *Handler) deleteConfig(w http.ResponseWriter, r *http.Request) {
@@ -179,4 +227,22 @@ func (h *Handler) stopRemote(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpapi.WriteJSON(w, http.StatusOK, result)
+}
+
+func validateServerConfig(name string, typ ServerType, sshAlias string) error {
+	if name == "" {
+		return fmt.Errorf("name is required")
+	}
+	switch typ {
+	case TypeLocal, TypeManualURL, TypeSSHAlias:
+		// valid
+	case "":
+		// default: let the registry apply the default
+	default:
+		return fmt.Errorf("unsupported server type: %s", string(typ))
+	}
+	if typ == TypeSSHAlias && sshAlias == "" {
+		return fmt.Errorf("SSH alias is required for SSH targets")
+	}
+	return nil
 }
