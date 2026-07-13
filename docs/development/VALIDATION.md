@@ -51,6 +51,32 @@ docker build -t glyphdeck:preview .
 npm.cmd --prefix packages/launcher ci
 npm.cmd --prefix packages/launcher test
 npm.cmd pack .\packages\launcher --dry-run
+
+## Config Inspection Validation
+
+The config inspection API and UI can be validated through the running
+application:
+
+```powershell
+# API — global config
+Invoke-RestMethod -Uri "http://127.0.0.1:8756/api/opencode/config/inventory" -Headers @{ Cookie = $sessionCookie }
+
+# API — project config (requires trusted project)
+Invoke-RestMethod -Uri "http://127.0.0.1:8756/api/opencode/config/inventory?projectId=<id>" -Headers @{ Cookie = $sessionCookie }
+```
+
+Verify:
+- Sources include global and project entries.
+- Agents list includes those from `opencode.json` and `agents/` directory.
+- MCP server entries never include headers, env vars, or API keys.
+- Malformed JSON produces parse warnings rather than crashes.
+- Untrusted projects receive a warning and skip project config.
+- Providers, models, and shell profiles are present when configured.
+
+### Config UI screenshots
+
+Headless validation script captures 8 screenshots of config views under
+`.glyphdeck/validation/config-inspection/screenshots/`.
 ```
 
 ## Docker Preview Smoke Test

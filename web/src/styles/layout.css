@@ -1912,3 +1912,219 @@
   color: var(--color-accent);
   margin-bottom: 12px;
 }
+
+/* Config inspection panels (Agents, MCPs, Skills, Plugins, Settings config) */
+.config-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.config-panel__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.config-panel__title {
+  font-weight: 600;
+  font-size: var(--font-size-base);
+}
+
+.config-panel__filters {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.config-filter-btn {
+  padding: 2px 8px;
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.config-filter-btn.active {
+  background: var(--color-accent);
+  color: white;
+  border-color: var(--color-accent);
+}
+
+.config-refresh-btn {
+  padding: 2px 8px;
+  font-size: var(--font-size-sm);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 4px;
+  cursor: pointer;
+  margin-left: 4px;
+}
+
+.config-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  overflow-y: auto;
+}
+
+.config-item {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.config-item__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.config-item__name {
+  font-weight: 600;
+  font-size: var(--font-size-sm);
+}
+
+.config-item__desc {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  margin: 4px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-item__meta {
+  font-size: var(--font-size-xs);
+  color: var(--color-muted);
+  margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.config-item__path {
+  font-family: monospace;
+  font-size: var(--font-size-xs);
+}
+
+.config-badge {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: var(--color-border);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.config-badge--global {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.config-badge--project {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.config-badge--role {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.config-badge--type {
+  background: #ede9fe;
+  color: #5b21b6;
+}
+
+.config-badge--disabled {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.config-empty {
+  padding: 16px;
+  text-align: center;
+  color: var(--color-muted);
+}
+
+.config-source-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.config-source-item {
+  font-size: var(--font-size-xs);
+  padding: 2px 0;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.config-source-path {
+  font-family: monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.config-source-format {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--color-border);
+}
+
+.config-warning {
+  font-size: var(--font-size-xs);
+  color: #92400e;
+  background: #fef3c7;
+  padding: 4px 8px;
+  border-radius: 4px;
+  margin: 4px 0;
+}
+
+.settings-config-warnings {
+  margin-bottom: 8px;
+}
+
+.settings-divider {
+  border: none;
+  border-top: 1px solid var(--color-border);
+  margin: 16px 0 8px;
+}
+
+.settings-section-title {
+  font-size: var(--font-size-base);
+  font-weight: 600;
+  margin: 0 0 8px;
+}
+
+.config-item-list {
+  list-style: none;
+  padding: 0;
+  margin: 4px 0;
+}
+
+.config-item-list .config-item {
+  padding: 4px 0;
+  border-bottom: none;
+}
+
+/* Narrow layout fixes */
+@media (max-width: 700px) {
+  .config-item__meta {
+    max-width: 180px;
+  }
+  .config-source-path {
+    max-width: 200px;
+  }
+}

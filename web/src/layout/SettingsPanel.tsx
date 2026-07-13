@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { requestJson } from '../api/client'
+import type { ConfigInventory } from '../types/config'
 
 function SettingsPanel() {
   const [settings, setSettings] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
+  const [config, setConfig] = useState<ConfigInventory | null>(null)
+  const [configLoading, setConfigLoading] = useState(false)
+  const [configError, setConfigError] = useState('')
 
   const loadSettings = useCallback(async () => {
     try {
@@ -21,6 +25,23 @@ function SettingsPanel() {
   useEffect(() => {
     loadSettings()
   }, [loadSettings])
+
+  const loadConfig = useCallback(async () => {
+    setConfigLoading(true)
+    setConfigError('')
+    try {
+      const data = await requestJson<ConfigInventory>('/api/opencode/config/inventory')
+      setConfig(data)
+    } catch (err) {
+      setConfigError(err instanceof Error ? err.message : 'Failed to load.')
+    } finally {
+      setConfigLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadConfig()
+  }, [loadConfig])
 
   function updateField(key: string, value: string) {
     setSettings((prev) => ({ ...prev, [key]: value }))
@@ -119,6 +140,90 @@ function SettingsPanel() {
           </select>
           <p className="settings-hint">Backend logging verbosity.</p>
         </div>
+
+        <hr className="settings-divider" />
+        <h3 className="settings-section-title">OpenCode Configuration</h3>
+
+        {configLoading ? (
+          <p className="panel-hint">Loading config…</p>
+        ) : configError ? (
+          <p className="panel-error" data-testid="settings-config-error">{configError}</p>
+        ) : config && config.available ? (
+          <div data-testid="settings-config-section">
+            {config.warnings?.length > 0 && (
+              <div className="settings-config-warnings" data-testid="settings-config-warnings">
+                {config.warnings.map((w, i) => (
+                  <p key={i} className="config-warning">⚠ {w.source}: {w.message}</p>
+                ))}
+              </div>
+            )}
+            {(config.sources?.length ?? 0) > 0 && (
+              <div className="settings-group">
+                <label className="settings-label">Configuration Sources</label>
+                <ul className="config-source-list" data-testid="settings-config-sources">
+                  {config.sources.map((s, i) => (
+                    <li key={i} className="config-source-item">
+                      <span className={`config-badge config-badge--${s.scope}`}>{s.scope}</span>
+                      <span className="config-source-path">{s.path}</span>
+                      <span className="config-source-format">{s.format}</span>
+                      {s.warning && <span className="config-warning">⚠ {s.warning}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(config.providers?.length ?? 0) > 0 && (
+              <div className="settings-group">
+                <label className="settings-label">Providers</label>
+                <ul className="config-item-list" data-testid="settings-config-providers">
+                  {config.providers.map((p) => (
+                    <li key={p.id} className="config-item">
+                      <strong>{p.id}</strong> {p.name && `(${p.name})`}
+                      <span className={`config-badge config-badge--${p.scope}`}>{p.scope}</span>
+                      {p.baseUrl && <span className="config-item__meta"> — {p.baseUrl}</span>}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(config.models?.length ?? 0) > 0 && (
+              <div className="settings-group">
+                <label className="settings-label">Models</label>
+                <ul className="config-item-list" data-testid="settings-config-models">
+                  {config.models.map((m) => (
+                    <li key={m.id} className="config-item">
+                      <strong>{m.id}</strong> {m.name && `(${m.name})`}
+                      <span className={`config-badge config-badge--${m.scope}`}>{m.scope}</span>
+                      <span className="config-item__meta"> — provider: {m.provider}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            {(config.shellProfiles?.length ?? 0) > 0 && (
+              <div className="settings-group">
+                <label className="settings-label">Shell Profiles</label>
+                <ul className="config-item-list" data-testid="settings-config-shells">
+                  {config.shellProfiles.map((s, i) => (
+                    <li key={i} className="config-item">
+                      <strong>{s.name}</strong>
+                      <span className={`config-badge config-badge--${s.scope}`}>{s.scope}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
+            <button className="config-refresh-btn" onClick={loadConfig} data-testid="settings-config-refresh">
+              Refresh Config
+            </button>
+          </div>
+        ) : (
+          <p className="panel-hint" data-testid="settings-config-unavailable">OpenCode configuration unavailable.</p>
+        )}
       </div>
     </div>
   )

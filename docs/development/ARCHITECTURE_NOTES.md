@@ -86,6 +86,13 @@ are the core leaf abstractions (fan-in 10 and 6 respectively).
   downloads and verifies release binaries from GitHub. It does not contain or
   rebuild GlyphDeck. Platform detection maps `process.platform`/`process.arch`
   to release assets. Version X.Y.Z maps to GitHub tag vX.Y.Z.
+- **Config inspection** (`internal/opencode/config/`) provides read-only
+  scanning of OpenCode configuration files (JSON/JSONC). Global config
+  (`~/.config/opencode/`) and project config (`{project}/.opencode/`) are
+  merged with global/project scope markers. Sensitive fields (API keys, tokens,
+  headers, env vars) are redacted or stripped. Credential-bearing URLs and
+  command arguments are sanitized. Path containment and symlink resolution
+  prevent traversal reads. Only trusted projects are scanned.
 
 ## Docker Compose Preview
 

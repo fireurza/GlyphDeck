@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import ReviewPanel from './ReviewPanel'
 import UsagePanel from './UsagePanel'
+import AgentsPanel from './AgentsPanel'
 
 const TABS = ['Review', 'Usage', 'Tasks', 'Agents'] as const
 
@@ -35,8 +36,9 @@ function RightPanel({ selectedProjectId, selectedSessionId }: RightPanelProps) {
             selectedSessionId={selectedSessionId}
           />
         )
-      case 'Tasks':
       case 'Agents':
+        return <AgentsPanel selectedProjectId={selectedProjectId} />
+      case 'Tasks':
       default:
         return (
           <div className="panel-body panel-placeholder">
@@ -61,7 +63,7 @@ function RightPanel({ selectedProjectId, selectedSessionId }: RightPanelProps) {
           </button>
         ))}
       </div>
-      {selectedProjectId ? renderPanel() : (
+      {selectedProjectId || activeTab === 'Agents' ? renderPanel() : (
         <div className="panel-body panel-placeholder">
           <p>No project selected</p>
           <p className="panel-hint">Select a project to view data.</p>
