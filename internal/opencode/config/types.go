@@ -4,23 +4,23 @@ package config
 
 // Inventory is the complete read-only snapshot of OpenCode configuration.
 type Inventory struct {
-	Available     bool              `json:"available"`
-	Reason        string            `json:"reason"`
-	Sources       []ConfigSource    `json:"sources"`
-	Agents        []AgentEntry      `json:"agents"`
-	Providers     []ProviderEntry   `json:"providers"`
-	Models        []ModelEntry      `json:"models"`
-	MCPServers    []MCPServerEntry  `json:"mcpServers"`
-	Skills        []SkillEntry      `json:"skills"`
-	Plugins       []PluginEntry     `json:"plugins"`
-	ShellProfiles []ShellProfile    `json:"shellProfiles"`
-	Warnings      []ConfigWarning   `json:"warnings"`
+	Available     bool             `json:"available"`
+	Reason        string           `json:"reason"`
+	Sources       []ConfigSource   `json:"sources"`
+	Agents        []AgentEntry     `json:"agents"`
+	Providers     []ProviderEntry  `json:"providers"`
+	Models        []ModelEntry     `json:"models"`
+	MCPServers    []MCPServerEntry `json:"mcpServers"`
+	Skills        []SkillEntry     `json:"skills"`
+	Plugins       []PluginEntry    `json:"plugins"`
+	ShellProfiles []ShellProfile   `json:"shellProfiles"`
+	Warnings      []ConfigWarning  `json:"warnings"`
 }
 
 // ConfigSource identifies a configuration file that was inspected.
 type ConfigSource struct {
 	Path    string `json:"path"`
-	Scope   string `json:"scope"` // "global" or "project"
+	Scope   string `json:"scope"`  // "global" or "project"
 	Format  string `json:"format"` // "json", "jsonc", "markdown", "directory"
 	Loaded  bool   `json:"loaded"`
 	Warning string `json:"warning,omitempty"`
@@ -29,7 +29,7 @@ type ConfigSource struct {
 // AgentEntry describes a discovered OpenCode agent.
 type AgentEntry struct {
 	Name        string `json:"name"`
-	Scope       string `json:"scope"` // "global" or "project"
+	Scope       string `json:"scope"`  // "global" or "project"
 	Source      string `json:"source"` // "opencode.json", "agents/", or "AGENTS.md"
 	SourceFile  string `json:"sourceFile,omitempty"`
 	Role        string `json:"role,omitempty"` // "primary" or "subagent"
