@@ -150,8 +150,12 @@ func main() {
 
 	// OpenCode config inspection (read-only).
 	configRoot := opencodeConfigRoot()
-	configScanner := config.NewScanner(configRoot)
-	config.RegisterHandlers(mux, configScanner, registry)
+	configScanner, err := config.NewScanner(configRoot)
+	if err != nil {
+		log.Printf("config scanner init warning: %v", err)
+	} else {
+		config.RegisterHandlers(mux, configScanner, registry)
+	}
 
 	// Frontend — serve the compiled React assets embedded in this binary.
 	mux.HandleFunc("/", serveFrontend)
