@@ -13,55 +13,77 @@ import (
 
 const maxConfigFileSize = 2 * 1024 * 1024 // 2 MiB per config file
 
-// OpenCode global config root (platform-specific, resolved by caller).
-// Scanner stores resolved paths for containment validation.
+// Scanner holds resolved paths for containment validation.
 type Scanner struct {
-	globalConfigRoot string // e.g., ~/.config/opencode
+	globalConfigRoot string // canonicalized ~/.config/opencode
 }
 
 // NewScanner creates a Scanner for the given global OpenCode config directory.
-func NewScanner(globalConfigRoot string) *Scanner {
-	return &Scanner{globalConfigRoot: globalConfigRoot}
+// The root is canonicalized via filepath.EvalSymlinks.
+func NewScanner(globalConfigRoot string) (*Scanner, error) {
+	if globalConfigRoot == "" {
+		return nil, fmt.Errorf("global config root is required")
+	}
+	canon, err := filepath.EvalSymlinks(globalConfigRoot)
+	if err != nil {
+		return nil, fmt.Errorf("cannot resolve config root %s: %w", globalConfigRoot, err)
+	}
+	return &Scanner{globalConfigRoot: canon}, nil
 }
 
 // ScanGlobal scans the global OpenCode configuration directory.
+// Missing global config returns an available empty inventory.
 func (s *Scanner) ScanGlobal() *Inventory {
 	inv := &Inventory{Available: true}
 
-	// Read the main config file (prefer .jsonc, fall back to .json).
+	// Read the main config file.
 	configPath, configData, format, err := s.readConfigFile(s.globalConfigRoot)
-	if err != nil {
-		inv.Available = false
-		inv.Reason = fmt.Sprintf("cannot read global config: %v", err)
-		return inv
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		inv.Warnings = append(inv.Warnings, ConfigWarning{
+			Source:  configPath,
+			Message: fmt.Sprintf("cannot read config: %v", err),
+		})
+	}
+	if configData != nil {
+		inv.Sources = append(inv.Sources, ConfigSource{
+			Path:   configPath,
+			Scope:  "global",
+			Format: format,
+			Loaded: true,
+		})
+		s.parseConfig(inv, configData, "global", configPath)
 	}
 
-	inv.Sources = append(inv.Sources, ConfigSource{
-		Path:   configPath,
-		Scope:  "global",
-		Format: format,
-		Loaded: true,
-	})
-
-	s.parseConfig(inv, configData, "global", configPath)
-
-	// Scan subdirectories.
-	s.scanAgentsDir(inv, s.globalConfigRoot, "global")
-	s.scanSkillsDir(inv, s.globalConfigRoot, "global")
-	s.scanPluginsDir(inv, s.globalConfigRoot, "global")
+	// Scan subdirectories (even if main config is missing).
+	s.scanDir(inv, "agents", s.globalConfigRoot, "global")
+	s.scanDir(inv, "skills", s.globalConfigRoot, "global")
+	s.scanDir(inv, "plugins", s.globalConfigRoot, "global")
 
 	s.sortAll(inv)
 	return inv
 }
 
 // ScanProject scans a registered project's .opencode directory.
-// The project root must be validated before calling this method.
 func (s *Scanner) ScanProject(inv *Inventory, projectRoot string) {
-	projectConfigDir := filepath.Join(projectRoot, ".opencode")
+	canonRoot, err := filepath.EvalSymlinks(projectRoot)
+	if err != nil {
+		inv.Warnings = append(inv.Warnings, ConfigWarning{
+			Source:  projectRoot,
+			Message: fmt.Sprintf("cannot resolve project root: %v", err),
+		})
+		return
+	}
 
-	// Read project config if it exists.
-	configPath, configData, format, err := s.readConfigFile(projectConfigDir)
-	if err == nil {
+	projectConfigDir := filepath.Join(canonRoot, ".opencode")
+
+	configPath, configData, format, err := s.readConfigFileInRoot(projectConfigDir, projectConfigDir)
+	if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		inv.Warnings = append(inv.Warnings, ConfigWarning{
+			Source:  configPath,
+			Message: fmt.Sprintf("cannot read project config: %v", err),
+		})
+	}
+	if configData != nil {
 		inv.Sources = append(inv.Sources, ConfigSource{
 			Path:   configPath,
 			Scope:  "project",
@@ -69,19 +91,65 @@ func (s *Scanner) ScanProject(inv *Inventory, projectRoot string) {
 			Loaded: true,
 		})
 		s.parseConfig(inv, configData, "project", configPath)
-	} else if !errors.Is(err, fs.ErrNotExist) {
-		inv.Warnings = append(inv.Warnings, ConfigWarning{
-			Source:  configPath,
-			Message: fmt.Sprintf("cannot read project config: %v", err),
-		})
 	}
 
-	// Scan subdirectories under .opencode.
-	s.scanAgentsDir(inv, projectConfigDir, "project")
-	s.scanSkillsDir(inv, projectConfigDir, "project")
-	s.scanPluginsDir(inv, projectConfigDir, "project")
+	s.scanDir(inv, "agents", projectConfigDir, "project")
+	s.scanDir(inv, "skills", projectConfigDir, "project")
+	s.scanDir(inv, "plugins", projectConfigDir, "project")
 
 	s.sortAll(inv)
+}
+
+// ---------------------------------------------------------------------------
+// Path containment
+// ---------------------------------------------------------------------------
+
+// isContained returns true if path (canonical, resolved symlinks) is within root.
+func isContained(path, root string) (bool, error) {
+	canonRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return false, err
+	}
+
+	// Try to resolve symlinks on path. If it doesn't exist yet, resolve the parent.
+	canonPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		// If the file doesn't exist, resolve the parent directory and check containment there.
+		parent := filepath.Dir(path)
+		canonParent, pErr := filepath.EvalSymlinks(parent)
+		if pErr != nil {
+			return false, pErr
+		}
+		canonPath = filepath.Join(canonParent, filepath.Base(path))
+	}
+
+	rel, err := filepath.Rel(canonRoot, canonPath)
+	if err != nil {
+		return false, err
+	}
+	if strings.HasPrefix(rel, "..") || filepath.IsAbs(rel) {
+		return false, nil
+	}
+	return true, nil
+}
+
+// safeReadDir reads directory entries and rejects symlinks that escape the root.
+func (s *Scanner) safeReadDir(dir string, root string) ([]os.DirEntry, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, err
+	}
+
+	var safe []os.DirEntry
+	for _, e := range entries {
+		fullPath := filepath.Join(dir, e.Name())
+		contained, cErr := isContained(fullPath, root)
+		if cErr != nil || !contained {
+			continue // Skip symlink escapes and traversal.
+		}
+		safe = append(safe, e)
+	}
+	return safe, nil
 }
 
 // ---------------------------------------------------------------------------
@@ -89,10 +157,13 @@ func (s *Scanner) ScanProject(inv *Inventory, projectRoot string) {
 // ---------------------------------------------------------------------------
 
 func (s *Scanner) readConfigFile(configDir string) (path string, data []byte, format string, err error) {
-	// Prefer .jsonc over .json.
+	return s.readConfigFileInRoot(configDir, configDir)
+}
+
+func (s *Scanner) readConfigFileInRoot(configDir, root string) (path string, data []byte, format string, err error) {
 	for _, name := range []string{"opencode.jsonc", "opencode.json"} {
 		p := filepath.Join(configDir, name)
-		d, fErr := s.safeReadFile(p)
+		d, fErr := safeReadInRoot(p, root)
 		if fErr == nil {
 			format := "json"
 			if strings.HasSuffix(name, ".jsonc") {
@@ -107,8 +178,24 @@ func (s *Scanner) readConfigFile(configDir string) (path string, data []byte, fo
 	return filepath.Join(configDir, "opencode.jsonc"), nil, "", fs.ErrNotExist
 }
 
-// safeReadFile reads a file with a size limit.
 func (s *Scanner) safeReadFile(path string) ([]byte, error) {
+	return safeReadInRoot(path, s.globalConfigRoot)
+}
+
+// safeReadInRoot reads a file if it is contained within root.
+func safeReadInRoot(path, root string) ([]byte, error) {
+	// If root is empty, allow the read (caller is trusted to validate).
+	if root == "" {
+		return readFileWithLimit(path)
+	}
+	contained, err := isContained(path, root)
+	if err != nil || !contained {
+		return nil, fmt.Errorf("path traversal rejected: %s", path)
+	}
+	return readFileWithLimit(path)
+}
+
+func readFileWithLimit(path string) ([]byte, error) {
 	fi, err := os.Stat(path)
 	if err != nil {
 		return nil, err
@@ -123,13 +210,11 @@ func (s *Scanner) safeReadFile(path string) ([]byte, error) {
 // JSON/JSONC parsing
 // ---------------------------------------------------------------------------
 
-// parseConfig parses a raw config file and populates the inventory.
 func (s *Scanner) parseConfig(inv *Inventory, data []byte, scope, sourcePath string) {
-	if data == nil || len(data) == 0 {
+	if len(data) == 0 {
 		return
 	}
 
-	// Strip JSONC comments (// and /* */) before parsing.
 	cleaned := stripJSONCComments(data)
 
 	var raw map[string]any
@@ -141,38 +226,121 @@ func (s *Scanner) parseConfig(inv *Inventory, data []byte, scope, sourcePath str
 		return
 	}
 
-	// Extract agents.
 	s.parseAgents(inv, raw, scope, sourcePath)
-
-	// Extract providers and models.
 	s.parseProviders(inv, raw, scope)
-
-	// Extract MCP servers.
 	s.parseMCP(inv, raw, scope, sourcePath)
-
-	// Extract plugins.
 	s.parsePlugins(inv, raw, scope, sourcePath)
-
-	// Extract shell.
 	s.parseShell(inv, raw, scope)
+
+	// Sanitize any remaining credential-bearing fields.
+	s.sanitizeAll(inv)
 }
+
+func (s *Scanner) sanitizeAll(inv *Inventory) {
+	for i := range inv.Agents {
+		inv.Agents[i].Model = sanitizeModelField(inv.Agents[i].Model)
+	}
+	for i := range inv.MCPServers {
+		inv.MCPServers[i].URL = sanitizeURL(inv.MCPServers[i].URL)
+		inv.MCPServers[i].Command = sanitizeCommand(inv.MCPServers[i].Command)
+	}
+}
+
+// sanitizeURL removes credentials from URLs (user:password@host).
+func sanitizeURL(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	// Find @ before the host portion.
+	atIdx := strings.LastIndex(raw, "@")
+	if atIdx < 0 {
+		return raw
+	}
+	// Check for protocol:// before the @.
+	protoEnd := strings.Index(raw, "://")
+	if protoEnd >= 0 && protoEnd < atIdx {
+		protoEnd += 3
+		return raw[:protoEnd] + "<redacted>@" + raw[atIdx+1:]
+	}
+	return raw
+}
+
+// sanitizeCommand redacts credential-bearing command arguments.
+func sanitizeCommand(raw string) string {
+	if raw == "" {
+		return raw
+	}
+	// Redact suspicious patterns: --api-key, --token, --password, etc.
+	sensitiveFlags := []string{"--api-key", "--apikey", "--token", "--password", "--secret", "--key", "-p"}
+	result := raw
+	for _, flag := range sensitiveFlags {
+		idx := strings.Index(strings.ToLower(result), strings.ToLower(flag))
+		if idx >= 0 {
+			// Find the space after this flag's value.
+			afterFlag := result[idx+len(flag):]
+			afterFlag = strings.TrimLeft(afterFlag, " =")
+			spaceIdx := strings.Index(afterFlag, " ")
+			if spaceIdx > 0 {
+				result = result[:idx+len(flag)] + "=<redacted>" + afterFlag[spaceIdx:]
+			} else {
+				result = result[:idx+len(flag)] + "=<redacted>"
+			}
+		}
+	}
+	return result
+}
+
+// sanitizeModelField is a no-op placeholder for field-level sanitization.
+func sanitizeModelField(val string) string { return val }
+
+// sensitiveKeyPattern matches credential-bearing keys.
+var sensitiveKeyPatterns = []string{
+	"key", "token", "secret", "password", "passwd",
+	"auth", "credential", "apikey", "api_key",
+}
+
+func isSensitiveKey(key string) bool {
+	lower := strings.ToLower(key)
+	for _, pat := range sensitiveKeyPatterns {
+		if strings.Contains(lower, pat) {
+			return true
+		}
+	}
+	return false
+}
+
+// stripCredentialFields removes known sensitive keys from a map.
+func stripCredentialFields(m map[string]any) map[string]any {
+	if m == nil {
+		return nil
+	}
+	result := make(map[string]any, len(m))
+	for k, v := range m {
+		if isSensitiveKey(k) {
+			result[k] = "<redacted>"
+		} else if nested, ok := v.(map[string]any); ok {
+			result[k] = stripCredentialFields(nested)
+		} else {
+			result[k] = v
+		}
+	}
+	return result
+}
+
+// ---------------------------------------------------------------------------
+// Sub-field parsers
+// ---------------------------------------------------------------------------
 
 func (s *Scanner) parseAgents(inv *Inventory, raw map[string]any, scope, sourcePath string) {
 	agents, ok := raw["agent"].(map[string]any)
 	if !ok {
-		// "agents" (plural) is an alternative key some configs use.
 		agents, _ = raw["agents"].(map[string]any)
 	}
-	if agents == nil {
-		return
-	}
-
 	for name, val := range agents {
 		cfg, ok := val.(map[string]any)
 		if !ok {
 			continue
 		}
-
 		entry := AgentEntry{
 			Name:       name,
 			Scope:      scope,
@@ -180,17 +348,15 @@ func (s *Scanner) parseAgents(inv *Inventory, raw map[string]any, scope, sourceP
 			SourceFile: sourcePath,
 			Enabled:    true,
 		}
-
 		if desc, ok := cfg["description"].(string); ok {
 			entry.Description = desc
 		}
 		if model, ok := cfg["model"].(string); ok {
-			entry.Model = model
+			entry.Model = sanitizeModelField(model)
 		}
 		if mode, ok := cfg["mode"].(string); ok {
 			entry.Role = mode
 		}
-
 		inv.Agents = append(inv.Agents, entry)
 	}
 }
@@ -200,35 +366,27 @@ func (s *Scanner) parseProviders(inv *Inventory, raw map[string]any, scope strin
 	if !ok {
 		providers, _ = raw["providers"].(map[string]any)
 	}
-	if providers == nil {
-		return
-	}
-
 	for id, val := range providers {
 		cfg, ok := val.(map[string]any)
 		if !ok {
 			continue
 		}
-
 		entry := ProviderEntry{
 			ID:      id,
 			Scope:   scope,
 			Enabled: true,
 		}
-
 		if name, ok := cfg["name"].(string); ok {
 			entry.Name = name
 		}
 		if baseURL, ok := cfg["baseUrl"].(string); ok {
-			entry.BaseURL = baseURL
+			entry.BaseURL = sanitizeURL(baseURL)
 		}
 		if baseURL, ok := cfg["base_url"].(string); ok {
-			entry.BaseURL = baseURL
+			entry.BaseURL = sanitizeURL(baseURL)
 		}
-
 		inv.Providers = append(inv.Providers, entry)
 
-		// Extract models from this provider.
 		if models, ok := cfg["models"].(map[string]any); ok {
 			for modelID, modelVal := range models {
 				modelCfg, _ := modelVal.(map[string]any)
@@ -250,35 +408,32 @@ func (s *Scanner) parseProviders(inv *Inventory, raw map[string]any, scope strin
 }
 
 func (s *Scanner) parseMCP(inv *Inventory, raw map[string]any, scope, sourcePath string) {
-	// MCP servers can be under "mcp" or "mcpServers".
 	mcp, ok := raw["mcp"].(map[string]any)
 	if !ok {
 		mcp, _ = raw["mcpServers"].(map[string]any)
 	}
-	if mcp == nil {
-		return
-	}
-
 	for name, val := range mcp {
 		cfg, ok := val.(map[string]any)
 		if !ok {
 			continue
 		}
 
+		// Redact sensitive fields.
+		cfg = stripCredentialFields(cfg)
+
 		entry := MCPServerEntry{
 			Name:       name,
 			Scope:      scope,
 			SourceFile: sourcePath,
 		}
-
 		if t, ok := cfg["type"].(string); ok {
 			entry.Type = t
 		}
 		if url, ok := cfg["url"].(string); ok {
-			entry.URL = url
+			entry.URL = sanitizeURL(url)
 		}
 		if cmd, ok := cfg["command"].(string); ok {
-			entry.Command = cmd
+			entry.Command = sanitizeCommand(cmd)
 		}
 		if cmds, ok := cfg["command"].([]any); ok {
 			parts := make([]string, 0, len(cmds))
@@ -287,16 +442,17 @@ func (s *Scanner) parseMCP(inv *Inventory, raw map[string]any, scope, sourcePath
 					parts = append(parts, s)
 				}
 			}
-			entry.Command = strings.Join(parts, " ")
+			entry.Command = sanitizeCommand(strings.Join(parts, " "))
 		}
-
-		// Enabled defaults to true unless explicitly false.
 		entry.Enabled = true
 		if enabled, ok := cfg["enabled"].(bool); ok {
 			entry.Enabled = enabled
 		}
+		// Strip env/headers fields entirely.
+		delete(cfg, "env")
+		delete(cfg, "headers")
+		delete(cfg, "header")
 
-		// Redact: never include headers, env, or apiKey fields.
 		inv.MCPServers = append(inv.MCPServers, entry)
 	}
 }
@@ -306,11 +462,9 @@ func (s *Scanner) parsePlugins(inv *Inventory, raw map[string]any, scope, source
 	if !ok {
 		return
 	}
-
 	for _, p := range plugins {
 		var id string
 		pluginType := "npm"
-
 		switch v := p.(type) {
 		case string:
 			id = v
@@ -327,7 +481,6 @@ func (s *Scanner) parsePlugins(inv *Inventory, raw map[string]any, scope, source
 		default:
 			continue
 		}
-
 		inv.Plugins = append(inv.Plugins, PluginEntry{
 			ID:         id,
 			Scope:      scope,
@@ -343,7 +496,6 @@ func (s *Scanner) parseShell(inv *Inventory, raw map[string]any, scope string) {
 	if !ok || shell == "" {
 		return
 	}
-
 	inv.ShellProfiles = append(inv.ShellProfiles, ShellProfile{
 		Name:  shell,
 		Scope: scope,
@@ -354,21 +506,35 @@ func (s *Scanner) parseShell(inv *Inventory, raw map[string]any, scope string) {
 // Directory scanners
 // ---------------------------------------------------------------------------
 
-func (s *Scanner) scanAgentsDir(inv *Inventory, configDir, scope string) {
-	// Scan agents/ directory for markdown agent definitions.
-	agentsDir := filepath.Join(configDir, "agents")
-	entries, err := os.ReadDir(agentsDir)
+func (s *Scanner) scanDir(inv *Inventory, subdir, configDir, scope string) {
+	dirPath := filepath.Join(configDir, subdir)
+	_, err := s.safeReadDir(dirPath, configDir)
 	if err != nil {
 		return
 	}
 
 	inv.Sources = append(inv.Sources, ConfigSource{
-		Path:   agentsDir,
+		Path:   dirPath,
 		Scope:  scope,
 		Format: "directory",
 		Loaded: true,
 	})
 
+	switch subdir {
+	case "agents":
+		s.scanAgentsDir(inv, dirPath, scope)
+	case "skills":
+		s.scanSkillsDir(inv, dirPath, scope)
+	case "plugins":
+		s.scanPluginsDir(inv, dirPath, scope)
+	}
+}
+
+func (s *Scanner) scanAgentsDir(inv *Inventory, agentsDir, scope string) {
+	entries, err := s.safeReadDir(agentsDir, agentsDir)
+	if err != nil {
+		return
+	}
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -377,13 +543,10 @@ func (s *Scanner) scanAgentsDir(inv *Inventory, configDir, scope string) {
 		if !strings.HasSuffix(name, ".md") {
 			continue
 		}
-
 		agentName := strings.TrimSuffix(name, ".md")
-		// Don't duplicate agents already parsed from config.
 		if s.hasAgent(inv, agentName) {
 			continue
 		}
-
 		inv.Agents = append(inv.Agents, AgentEntry{
 			Name:       agentName,
 			Scope:      scope,
@@ -394,70 +557,48 @@ func (s *Scanner) scanAgentsDir(inv *Inventory, configDir, scope string) {
 	}
 }
 
-func (s *Scanner) scanSkillsDir(inv *Inventory, configDir, scope string) {
-	skillsDir := filepath.Join(configDir, "skills")
-	entries, err := os.ReadDir(skillsDir)
+func (s *Scanner) scanSkillsDir(inv *Inventory, skillsDir, scope string) {
+	entries, err := s.safeReadDir(skillsDir, skillsDir)
 	if err != nil {
 		return
 	}
-
-	inv.Sources = append(inv.Sources, ConfigSource{
-		Path:   skillsDir,
-		Scope:  scope,
-		Format: "directory",
-		Loaded: true,
-	})
-
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
 		}
-
 		skillName := entry.Name()
-		skillDir := filepath.Join(skillsDir, skillName)
-		skillFile := filepath.Join(skillDir, "SKILL.md")
-
+		skillFile := filepath.Join(skillsDir, skillName, "SKILL.md")
 		desc := ""
 		if data, err := s.safeReadFile(skillFile); err == nil {
-			// Extract first meaningful line from SKILL.md for description.
 			desc = extractFirstLine(string(data), 120)
 		}
-
 		inv.Skills = append(inv.Skills, SkillEntry{
 			Name:        skillName,
 			Scope:       scope,
-			SourceFile:  skillDir,
+			SourceFile:  filepath.Join(skillsDir, skillName),
 			Description: desc,
 			Enabled:     true,
 		})
 	}
 }
 
-func (s *Scanner) scanPluginsDir(inv *Inventory, configDir, scope string) {
-	pluginsDir := filepath.Join(configDir, "plugins")
-	entries, err := os.ReadDir(pluginsDir)
+func (s *Scanner) scanPluginsDir(inv *Inventory, pluginsDir, scope string) {
+	entries, err := s.safeReadDir(pluginsDir, pluginsDir)
 	if err != nil {
 		return
 	}
-
 	for _, entry := range entries {
 		if !entry.IsDir() {
-			// Skip loose files in plugins/.
 			continue
 		}
-
 		pluginName := entry.Name()
-		// Don't duplicate plugins already listed in plugin array.
 		if s.hasPlugin(inv, pluginName) {
 			continue
 		}
-
-		pluginDir := filepath.Join(pluginsDir, pluginName)
-
 		inv.Plugins = append(inv.Plugins, PluginEntry{
 			ID:         pluginName,
 			Scope:      scope,
-			SourceFile: pluginDir,
+			SourceFile: filepath.Join(pluginsDir, pluginName),
 			Type:       "local",
 			Enabled:    true,
 		})
@@ -497,7 +638,6 @@ func (s *Scanner) sortAll(inv *Inventory) {
 	sort.Slice(inv.ShellProfiles, func(i, j int) bool { return inv.ShellProfiles[i].Name < inv.ShellProfiles[j].Name })
 }
 
-// extractFirstLine returns the first non-empty line of text, truncated.
 func extractFirstLine(text string, maxLen int) string {
 	lines := strings.SplitN(text, "\n", 2)
 	first := strings.TrimSpace(lines[0])
@@ -507,16 +647,11 @@ func extractFirstLine(text string, maxLen int) string {
 	return first
 }
 
-// stripJSONCComments removes // and /* */ comments from JSONC content.
 func stripJSONCComments(data []byte) []byte {
-	// Simple state-machine comment stripper for JSONC.
-	// This handles line comments (//) and block comments (/* */).
 	var result []byte
 	i := 0
 	n := len(data)
-
 	for i < n {
-		// Check for string literals (skip them).
 		if data[i] == '"' {
 			result = append(result, data[i])
 			i++
@@ -535,10 +670,7 @@ func stripJSONCComments(data []byte) []byte {
 			}
 			continue
 		}
-
-		// Check for line comment.
 		if i+1 < n && data[i] == '/' && data[i+1] == '/' {
-			// Skip until end of line.
 			for i < n && data[i] != '\n' {
 				i++
 			}
@@ -548,8 +680,6 @@ func stripJSONCComments(data []byte) []byte {
 			}
 			continue
 		}
-
-		// Check for block comment.
 		if i+1 < n && data[i] == '/' && data[i+1] == '*' {
 			i += 2
 			for i+1 < n {
@@ -559,14 +689,11 @@ func stripJSONCComments(data []byte) []byte {
 				}
 				i++
 			}
-			// Replace block comment with a space to maintain position context.
 			result = append(result, ' ')
 			continue
 		}
-
 		result = append(result, data[i])
 		i++
 	}
-
 	return result
 }
