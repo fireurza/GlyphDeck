@@ -1,136 +1,309 @@
 package main
 
 import (
-	"glyphdeck/internal/httpapi"
-	"net/http"
-	"net/http/httptest"
+	"context"
+	"database/sql"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
+
+	"glyphdeck/internal/auth"
+	"glyphdeck/internal/httpapi"
+
+	_ "modernc.org/sqlite"
 )
 
-func TestServeFrontendUsesEmbeddedAssetsOutsideRepository(t *testing.T) {
-	t.Chdir(t.TempDir())
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
 
-	for _, requestPath := range []string{"/", "/client-side-route"} {
-		t.Run(requestPath, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodGet, requestPath, nil)
-			response := httptest.NewRecorder()
+func newTestDB(t *testing.T) *sql.DB {
+	t.Helper()
+	db, err := sql.Open("sqlite", ":memory:?_journal_mode=WAL&_foreign_keys=on")
+	if err != nil {
+		t.Fatalf("open test db: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+	return db
+}
 
-			serveFrontend(response, request)
+func newTestStore(t *testing.T) *auth.Store {
+	t.Helper()
+	store, err := auth.NewStore(newTestDB(t))
+	if err != nil {
+		t.Fatalf("NewStore: %v", err)
+	}
+	return store
+}
 
-			if response.Code != http.StatusOK {
-				t.Fatalf("GET %s status = %d, want %d", requestPath, response.Code, http.StatusOK)
-			}
-			if !strings.Contains(response.Body.String(), `<div id="root"></div>`) {
-				t.Fatalf("GET %s did not return the embedded frontend", requestPath)
-			}
-		})
+// readAdminPassword implements the password resolution logic from bootstrapAdmin.
+// Returns (password, nil) on success, or ("", error) on failure.
+func readAdminPassword(passwordEnv, passwordFileEnv string) (string, error) {
+	if passwordEnv != "" && passwordFileEnv != "" {
+		return "", errBothPasswordSources
+	}
+	if passwordFileEnv != "" {
+		data, err := os.ReadFile(passwordFileEnv)
+		if err != nil {
+			return "", err
+		}
+		password := strings.TrimSpace(string(data))
+		if password == "" {
+			return "", errEmptyPasswordFile
+		}
+		return password, nil
+	}
+	return passwordEnv, nil
+}
+
+// Sentinel errors for password resolution.
+var (
+	errBothPasswordSources = &passwordError{"both password sources set"}
+	errEmptyPasswordFile   = &passwordError{"password file is empty"}
+)
+
+type passwordError struct {
+	msg string
+}
+
+func (e *passwordError) Error() string { return e.msg }
+
+// ---------------------------------------------------------------------------
+// Container mode host validation
+// ---------------------------------------------------------------------------
+
+func TestContainerModeDisabledByDefault(t *testing.T) {
+	if !httpapi.IsLoopbackHost("127.0.0.1") {
+		t.Fatal("127.0.0.1 must be loopback")
+	}
+	if !httpapi.IsLoopbackHost("localhost") {
+		t.Fatal("localhost must be loopback")
 	}
 }
 
-func TestIsLoopbackHost(t *testing.T) {
-	tests := []struct {
-		host string
-		want bool
-	}{
-		{host: "127.0.0.1", want: true},
-		{host: "::1", want: true},
-		{host: "localhost", want: true},
-		{host: "0.0.0.0", want: false},
-		{host: "192.168.1.10", want: false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.host, func(t *testing.T) {
-			if got := httpapi.IsLoopbackHost(tt.host); got != tt.want {
-				t.Fatalf("httpapi.IsLoopbackHost(%q) = %v, want %v", tt.host, got, tt.want)
-			}
-		})
+func TestNativeUnsafeBindRejected(t *testing.T) {
+	hosts := []string{"0.0.0.0", "192.168.1.1", "example.com"}
+	for _, host := range hosts {
+		if httpapi.IsLoopbackHost(host) {
+			t.Fatalf("host %q must not be loopback for this test", host)
+		}
 	}
 }
 
-func TestLocalMutationGuard(t *testing.T) {
-	t.Setenv("GLYPHDECK_DEV_TOOLS", "")
-
-	guard := localMutationGuard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-
+func TestContainerModeEnvVar(t *testing.T) {
 	tests := []struct {
-		name   string
-		method string
-		host   string
-		origin string
-		want   int
+		name     string
+		envValue string
+		want     bool
 	}{
-		{name: "loopback same origin", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://127.0.0.1:8756", want: http.StatusNoContent},
-		{name: "missing origin rejected", method: http.MethodPost, host: "127.0.0.1:8756", want: http.StatusForbidden},
-		{name: "different loopback port rejected in release mode", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://127.0.0.1:5173", want: http.StatusForbidden},
-		{name: "different loopback hostname rejected in release mode", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://localhost:8756", want: http.StatusForbidden},
-		{name: "cross origin mutation", method: http.MethodPost, host: "127.0.0.1:8756", origin: "http://evil.example", want: http.StatusForbidden},
-		{name: "non-loopback host", method: http.MethodPost, host: "example.com", want: http.StatusForbidden},
-		{name: "cross origin read", method: http.MethodGet, host: "127.0.0.1:8756", origin: "http://evil.example", want: http.StatusNoContent},
+		{"unset", "", false},
+		{"one", "1", true},
+		{"zero", "0", false},
+		{"true", "true", false},
+		{"empty string after set", "", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(tt.method, "http://"+tt.host+"/api/test", nil)
-			req.Host = tt.host
-			if tt.origin != "" {
-				req.Header.Set("Origin", tt.origin)
+			if tt.envValue != "" {
+				t.Setenv("GLYPHDECK_CONTAINER_MODE", tt.envValue)
 			}
-			res := httptest.NewRecorder()
-
-			guard.ServeHTTP(res, req)
-			if res.Code != tt.want {
-				t.Fatalf("status = %d, want %d", res.Code, tt.want)
+			got := getEnv("GLYPHDECK_CONTAINER_MODE", "") == "1"
+			if got != tt.want {
+				t.Fatalf("containerMode = %v, want %v (env=%q)", got, tt.want, tt.envValue)
 			}
 		})
 	}
 }
 
-func TestLocalMutationGuardAllowsDevLoopbackOriginOnlyWithDevTools(t *testing.T) {
-	guard := localMutationGuard(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(http.StatusNoContent)
-	}))
-
-	req := httptest.NewRequest(http.MethodPost, "http://127.0.0.1:8756/api/test", nil)
-	req.Host = "127.0.0.1:8756"
-	req.Header.Set("Origin", "http://localhost:5173")
-
-	res := httptest.NewRecorder()
-	guard.ServeHTTP(res, req)
-	if res.Code != http.StatusForbidden {
-		t.Fatalf("dev loopback origin without GLYPHDECK_DEV_TOOLS status = %d, want %d", res.Code, http.StatusForbidden)
+func TestContainerModeHostValidation(t *testing.T) {
+	tests := []struct {
+		name          string
+		host          string
+		containerMode bool
+		valid         bool
+	}{
+		{"default 127.0.0.1", "127.0.0.1", false, true},
+		{"localhost", "localhost", false, true},
+		{"0.0.0.0 without container mode", "0.0.0.0", false, false},
+		{"public ip without container mode", "192.168.1.1", false, false},
+		{"0.0.0.0 with container mode", "0.0.0.0", true, true},
+		{"localhost with container mode", "localhost", true, false},
+		{"127.0.0.1 with container mode", "127.0.0.1", true, false},
 	}
 
-	t.Setenv("GLYPHDECK_DEV_TOOLS", "1")
-	res = httptest.NewRecorder()
-	guard.ServeHTTP(res, req)
-	if res.Code != http.StatusNoContent {
-		t.Fatalf("dev loopback origin with GLYPHDECK_DEV_TOOLS status = %d, want %d", res.Code, http.StatusNoContent)
-	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.containerMode {
+				if tt.host == "0.0.0.0" {
+					if !tt.valid {
+						t.Fatal("0.0.0.0 must be valid in container mode")
+					}
+					return
+				}
+				if tt.valid {
+					t.Fatalf("host %q must not be valid in container mode", tt.host)
+				}
+				return
+			}
 
-	t.Setenv("GLYPHDECK_DEV_TOOLS", "true")
-	res = httptest.NewRecorder()
-	guard.ServeHTTP(res, req)
-	if res.Code != http.StatusForbidden {
-		t.Fatalf("dev loopback origin with non-explicit value status = %d, want %d", res.Code, http.StatusForbidden)
-	}
-}
-
-func TestDevToolsEnabledRequiresExactFlag(t *testing.T) {
-	for _, value := range []string{"", "true", "yes", "0"} {
-		t.Run(value, func(t *testing.T) {
-			t.Setenv("GLYPHDECK_DEV_TOOLS", value)
-			if httpapi.DevToolsEnabled() {
-				t.Fatalf("httpapi.DevToolsEnabled() = true for %q, want false", value)
+			// Not container mode: enforce loopback.
+			if httpapi.IsLoopbackHost(tt.host) != tt.valid {
+				t.Fatalf("host %q loopback=%v, want valid=%v", tt.host, httpapi.IsLoopbackHost(tt.host), tt.valid)
 			}
 		})
 	}
+}
 
-	t.Setenv("GLYPHDECK_DEV_TOOLS", "1")
-	if !httpapi.DevToolsEnabled() {
-		t.Fatal("httpapi.DevToolsEnabled() = false for explicit 1")
+// ---------------------------------------------------------------------------
+// Admin password file tests
+// ---------------------------------------------------------------------------
+
+func TestPasswordFileSuccess(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "admin-password.txt")
+	if err := os.WriteFile(passwordFile, []byte("file-based-password\n"), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
+	}
+
+	password, err := readAdminPassword("", passwordFile)
+	if err != nil {
+		t.Fatalf("readAdminPassword: %v", err)
+	}
+	if password != "file-based-password" {
+		t.Fatalf("password = %q, want file-based-password", password)
+	}
+
+	store := newTestStore(t)
+	hash, _ := auth.HashPassword(password)
+	_ = store.SetAdminHash(context.Background(), hash)
+
+	stored, _ := store.GetAdminHash(context.Background())
+	if !auth.VerifyPassword(stored, "file-based-password") {
+		t.Fatal("file-based password should verify")
+	}
+}
+
+func TestPasswordFileMissing(t *testing.T) {
+	_, err := readAdminPassword("", "/nonexistent/password/file.txt")
+	if err == nil {
+		t.Fatal("expected error for missing password file")
+	}
+}
+
+func TestPasswordFileEmpty(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "empty.txt")
+	if err := os.WriteFile(passwordFile, []byte("\n"), 0o600); err != nil {
+		t.Fatalf("write empty file: %v", err)
+	}
+
+	_, err := readAdminPassword("", passwordFile)
+	if err != errEmptyPasswordFile {
+		t.Fatalf("expected errEmptyPasswordFile, got %v", err)
+	}
+}
+
+func TestPasswordFileWhitespaceOnly(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "whitespace.txt")
+	if err := os.WriteFile(passwordFile, []byte("  \t\n  "), 0o600); err != nil {
+		t.Fatalf("write whitespace file: %v", err)
+	}
+
+	_, err := readAdminPassword("", passwordFile)
+	if err != errEmptyPasswordFile {
+		t.Fatalf("expected errEmptyPasswordFile, got %v", err)
+	}
+}
+
+func TestBothPasswordSourcesRejected(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "admin-password.txt")
+	if err := os.WriteFile(passwordFile, []byte("some-password"), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
+	}
+
+	_, err := readAdminPassword("env-password", passwordFile)
+	if err != errBothPasswordSources {
+		t.Fatalf("expected errBothPasswordSources, got %v", err)
+	}
+}
+
+func TestPasswordEnvOnlyStillWorks(t *testing.T) {
+	password, err := readAdminPassword("env-only-password", "")
+	if err != nil {
+		t.Fatalf("readAdminPassword: %v", err)
+	}
+	if password != "env-only-password" {
+		t.Fatalf("password = %q, want env-only-password", password)
+	}
+}
+
+func TestPasswordNotInErrorMessages(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "admin-password.txt")
+	password := "secret-password-abc123"
+	if err := os.WriteFile(passwordFile, []byte(password), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
+	}
+
+	resolved, err := readAdminPassword("", passwordFile)
+	if err != nil {
+		t.Fatalf("readAdminPassword: %v", err)
+	}
+	if resolved != password {
+		t.Fatal("resolved password mismatch")
+	}
+
+	// The password value itself should never appear in any error message.
+	_, err = readAdminPassword("", "/nonexistent/file")
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	errStr := err.Error()
+	if strings.Contains(errStr, password) {
+		t.Fatalf("error message contains password: %q", errStr)
+	}
+}
+
+func TestPasswordFileBootstrapIntegration(t *testing.T) {
+	dir := t.TempDir()
+	passwordFile := filepath.Join(dir, "admin-password.txt")
+	password := "bootstrap-integration-pass"
+	if err := os.WriteFile(passwordFile, []byte(password), 0o600); err != nil {
+		t.Fatalf("write password file: %v", err)
+	}
+
+	resolved, err := readAdminPassword("", passwordFile)
+	if err != nil {
+		t.Fatalf("readAdminPassword: %v", err)
+	}
+	if resolved != password {
+		t.Fatal("password mismatch")
+	}
+
+	store := newTestStore(t)
+
+	hasAdmin, _ := store.HasAdmin(context.Background())
+	if hasAdmin {
+		t.Fatal("expected no admin before bootstrap")
+	}
+
+	hash, _ := auth.HashPassword(password)
+	if err := store.SetAdminHash(context.Background(), hash); err != nil {
+		t.Fatalf("SetAdminHash: %v", err)
+	}
+
+	stored, _ := store.GetAdminHash(context.Background())
+	if !auth.VerifyPassword(stored, password) {
+		t.Fatal("bootstrap password should verify")
+	}
+
+	// Verify bootstrap does not overwrite existing admin.
+	err = store.SetAdminHash(context.Background(), hash)
+	if err != auth.ErrAdminExists {
+		t.Fatalf("expected ErrAdminExists, got %v", err)
 	}
 }

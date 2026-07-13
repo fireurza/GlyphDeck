@@ -166,3 +166,19 @@ jobs:
             go build -o dist/glyphdeck ./cmd/glyphdeck
           fi
         shell: bash
+
+  docker:
+    name: Docker
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate Compose config
+        run: docker compose -f compose.yaml config
+
+      - name: Build Docker image
+        run: docker build -t glyphdeck:preview .
+        # No push, no registry authentication, no privileged containers.

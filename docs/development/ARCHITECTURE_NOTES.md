@@ -75,3 +75,35 @@ are the core leaf abstractions (fan-in 10 and 6 respectively).
 - **Remote lifecycle ownership** records PID, URL, status, and ownership metadata.
   Start captures a PID, detach only clears active-target selection, and stop
   verifies the expected remote process before acting on the exact recorded PID.
+- **Container mode** (`GLYPHDECK_CONTAINER_MODE=1`) allows the server to bind
+  `0.0.0.0` internally for Docker networking. Host publication remains
+  loopback-only via the Compose port mapping. Outside container mode, only
+  loopback hosts are accepted.
+- **Password file** (`GLYPHDECK_ADMIN_PASSWORD_FILE`) reads the admin password
+  from a file instead of an environment variable. Both sources cannot be set
+  simultaneously. The password value is never logged.
+
+## Docker Compose Preview
+
+The `compose.yaml` at the repository root defines a single-service stack:
+
+- **glyphdeck** — the Go binary serving the embedded React frontend.
+- **app-data** — a named Docker volume for the SQLite database.
+- **glyphdeck_admin_password** — a Docker secret read from a local file.
+
+Security controls:
+
+| Control | Value |
+|---------|-------|
+| Runtime user | `glyphdeck` (non-root) |
+| Capabilities | `cap_drop: ALL` |
+| Privilege escalation | `no-new-privileges:true` |
+| Host publication | `127.0.0.1` loopback only |
+| Docker socket | Not mounted |
+| Privileged mode | Not enabled |
+| Root filesystem | Read-only with `tmpfs` for `/tmp` |
+| Init | `init: true` (tini) |
+| Restart | `unless-stopped` |
+
+OpenCode is **not bundled** in the container. The image includes an SSH client
+for remote SSH alias targets, but no SSH keys are mounted by default.

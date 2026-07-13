@@ -1,0 +1,50 @@
+# GlyphDeck Docker Compose preview.
+# This is a preview stack for local evaluation.
+# Docker is not the primary install path yet.
+
+services:
+  glyphdeck:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: glyphdeck:preview
+    ports:
+      # Loopback-only publication by default.
+      # Override GLYPHDECK_HOST_PORT to change the host port.
+      - "127.0.0.1:${GLYPHDECK_HOST_PORT:-8756}:8756"
+    volumes:
+      # Named volume for persistent SQLite app data.
+      - app-data:/home/glyphdeck/data
+    tmpfs:
+      # Required for read-only root filesystem compatibility.
+      - /tmp:exec
+    read_only: true
+    init: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    environment:
+      # Container-mode requires 0.0.0.0 bind so the container port is reachable.
+      # The published port is still restricted to 127.0.0.1 on the host.
+      - GLYPHDECK_HOST=0.0.0.0
+      - GLYPHDECK_CONTAINER_MODE=1
+      # Admin password is supplied through a Docker secret.
+      # See docs for how to create the secret file.
+      - GLYPHDECK_ADMIN_PASSWORD_FILE=/run/secrets/glyphdeck_admin_password
+    secrets:
+      - glyphdeck_admin_password
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8756/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  app-data:
+
+secrets:
+  glyphdeck_admin_password:
+    file: ./secrets/glyphdeck_admin_password.txt

@@ -39,7 +39,43 @@ go test ./... -count=1
 go vet ./cmd/... ./internal/... ./web/...
 npm.cmd --prefix web run test
 npm.cmd --prefix web run build
+go test -race ./... -count=1
+npm.cmd --prefix web audit --audit-level=high
+.\scripts\build.ps1
+.\scripts\validation\run-mvp-smoke.ps1
+.\scripts\validation\run-docker-preview-smoke.ps1
+docker compose -f compose.yaml config
+docker build -t glyphdeck:preview .
 ```
+
+## Docker Preview Smoke Test
+
+The Docker preview smoke test validates the Compose stack in an isolated
+environment.
+
+Run from the project root:
+
+```powershell
+.\scripts\validation\run-docker-preview-smoke.ps1
+```
+
+The test:
+
+- Uses an isolated, unique Compose project name.
+- Generates a random admin password — never exposed.
+- Builds the image from the repository Dockerfile.
+- Validates `docker compose config`.
+- Starts the service and waits for healthy status.
+- Verifies `/healthz` and the embedded UI respond.
+- Bootstraps admin, logs in, creates a persisted API record.
+- Recreates the container without deleting the data volume.
+- Confirms the persisted record survives recreation.
+- Confirms the container runs as a non-root user.
+- Confirms the published host address is loopback-only.
+- Confirms no Docker socket is mounted.
+- Confirms OpenCode is not required for startup.
+- Cleans up the isolated stack and volume in `finally`/error handling.
+- Preserves sanitized logs under `.glyphdeck/validation/docker-preview/`.
 
 ## Remote lifecycle UI validation
 

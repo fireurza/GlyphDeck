@@ -36,8 +36,19 @@ import (
 func main() {
 	host := getEnv("GLYPHDECK_HOST", "127.0.0.1")
 	port := getEnv("GLYPHDECK_PORT", "8756")
-	if !httpapi.IsLoopbackHost(host) {
-		log.Fatalf("server host must be loopback-only; set GLYPHDECK_HOST to 127.0.0.1 or localhost")
+	containerMode := getEnv("GLYPHDECK_CONTAINER_MODE", "") == "1"
+
+	if containerMode {
+		// Container mode allows binding to 0.0.0.0 so the container port
+		// is reachable from the Docker network. The host publication is
+		// still restricted to 127.0.0.1 by the compose port mapping.
+		if host != "0.0.0.0" {
+			log.Fatalf("container mode requires GLYPHDECK_HOST=0.0.0.0")
+		}
+	} else {
+		if !httpapi.IsLoopbackHost(host) {
+			log.Fatalf("server host must be loopback-only; set GLYPHDECK_HOST to 127.0.0.1 or localhost")
+		}
 	}
 	addr := net.JoinHostPort(host, port)
 
@@ -274,12 +285,31 @@ func (a *terminalProjectResolverAdapter) GetPath(ctx context.Context, id string)
 	return project.Path, nil
 }
 
-// bootstrapAdmin creates an admin from GLYPHDECK_ADMIN_PASSWORD if no admin exists.
+// bootstrapAdmin creates an admin from GLYPHDECK_ADMIN_PASSWORD or
+// GLYPHDECK_ADMIN_PASSWORD_FILE if no admin exists.
 func bootstrapAdmin(store *auth.Store) {
-	password := os.Getenv("GLYPHDECK_ADMIN_PASSWORD")
+	password := getEnv("GLYPHDECK_ADMIN_PASSWORD", "")
+	passwordFile := getEnv("GLYPHDECK_ADMIN_PASSWORD_FILE", "")
+
+	if password != "" && passwordFile != "" {
+		log.Fatalf("GLYPHDECK_ADMIN_PASSWORD and GLYPHDECK_ADMIN_PASSWORD_FILE are both set; use only one")
+	}
+
+	if passwordFile != "" {
+		data, err := os.ReadFile(passwordFile)
+		if err != nil {
+			log.Fatalf("auth bootstrap: cannot read password file %s: %v", passwordFile, err)
+		}
+		password = strings.TrimSpace(string(data))
+		if password == "" {
+			log.Fatalf("auth bootstrap: password file %s is empty", passwordFile)
+		}
+	}
+
 	if password == "" {
 		return
 	}
+
 	ctx := context.Background()
 	hasAdmin, err := store.HasAdmin(ctx)
 	if err != nil {
@@ -298,7 +328,7 @@ func bootstrapAdmin(store *auth.Store) {
 		log.Printf("auth bootstrap: error creating admin: %v", err)
 		return
 	}
-	log.Println("auth bootstrap: admin created from GLYPHDECK_ADMIN_PASSWORD")
+	log.Println("auth bootstrap: admin created")
 }
 
 // serveFrontend serves the React frontend embedded in the release binary.
