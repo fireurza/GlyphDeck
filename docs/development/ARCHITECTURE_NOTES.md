@@ -82,6 +82,10 @@ are the core leaf abstractions (fan-in 10 and 6 respectively).
 - **Password file** (`GLYPHDECK_ADMIN_PASSWORD_FILE`) reads the admin password
   from a file instead of an environment variable. Both sources cannot be set
   simultaneously. The password value is never logged.
+- **npm launcher** (`packages/launcher/`) is a thin Node.js wrapper that
+  downloads and verifies release binaries from GitHub. It does not contain or
+  rebuild GlyphDeck. Platform detection maps `process.platform`/`process.arch`
+  to release assets. Version X.Y.Z maps to GitHub tag vX.Y.Z.
 
 ## Docker Compose Preview
 

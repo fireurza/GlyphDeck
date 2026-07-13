@@ -46,6 +46,11 @@ npm.cmd --prefix web audit --audit-level=high
 .\scripts\validation\run-docker-preview-smoke.ps1
 docker compose -f compose.yaml config
 docker build -t glyphdeck:preview .
+
+# npm launcher
+npm.cmd --prefix packages/launcher ci
+npm.cmd --prefix packages/launcher test
+npm.cmd pack .\packages\launcher --dry-run
 ```
 
 ## Docker Preview Smoke Test

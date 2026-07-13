@@ -1,0 +1,38 @@
+{
+  "name": "@fireglyph/glyphdeck",
+  "version": "0.0.0-development",
+  "description": "Launcher for the GlyphDeck OpenCode workspace — downloads and runs the verified release binary.",
+  "license": "SEE LICENSE IN LICENSE",
+  "type": "module",
+  "bin": {
+    "glyphdeck": "./bin/glyphdeck.js"
+  },
+  "files": [
+    "bin/",
+    "src/",
+    "LICENSE",
+    "COMMERCIAL-LICENSING.md",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node --test --experimental-test-module-mocks test/*.test.js",
+    "pack-dry-run": "npm pack --dry-run"
+  },
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/fireurza/GlyphDeck.git",
+    "directory": "packages/launcher"
+  },
+  "keywords": [
+    "glyphdeck",
+    "opencode",
+    "launcher"
+  ],
+  "author": "FireGlyph Studios",
+  "publishConfig": {
+    "access": "public"
+  }
+}
