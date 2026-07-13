@@ -157,7 +157,7 @@ function SettingsPanel() {
                 ))}
               </div>
             )}
-            {config.sources?.length > 0 && (
+            {(config.sources?.length ?? 0) > 0 && (
               <div className="settings-group">
                 <label className="settings-label">Configuration Sources</label>
                 <ul className="config-source-list" data-testid="settings-config-sources">
@@ -173,7 +173,7 @@ function SettingsPanel() {
               </div>
             )}
 
-            {config.providers.length > 0 && (
+            {(config.providers?.length ?? 0) > 0 && (
               <div className="settings-group">
                 <label className="settings-label">Providers</label>
                 <ul className="config-item-list" data-testid="settings-config-providers">
@@ -188,7 +188,7 @@ function SettingsPanel() {
               </div>
             )}
 
-            {config.models.length > 0 && (
+            {(config.models?.length ?? 0) > 0 && (
               <div className="settings-group">
                 <label className="settings-label">Models</label>
                 <ul className="config-item-list" data-testid="settings-config-models">
@@ -203,7 +203,7 @@ function SettingsPanel() {
               </div>
             )}
 
-            {config.shellProfiles.length > 0 && (
+            {(config.shellProfiles?.length ?? 0) > 0 && (
               <div className="settings-group">
                 <label className="settings-label">Shell Profiles</label>
                 <ul className="config-item-list" data-testid="settings-config-shells">

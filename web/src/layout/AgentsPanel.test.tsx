@@ -127,7 +127,7 @@ test('no sensitive values rendered in agent data', async () => {
 })
 
 test('refresh reloads agents', async () => {
-  const mock = vi.spyOn(globalThis, 'fetch')
+  vi.spyOn(globalThis, 'fetch')
     .mockResolvedValueOnce(jsonResponse(mockInventory({ agents: [{ name: 'first', scope: 'global', source: 'agents/', enabled: true }] })))
     .mockResolvedValueOnce(jsonResponse(mockInventory({ agents: [{ name: 'second', scope: 'global', source: 'agents/', enabled: true }] })))
 
