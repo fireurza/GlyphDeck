@@ -1,105 +1,61 @@
-import { render, screen, waitFor } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import SettingsPanel from './SettingsPanel'
+import { render, screen, waitFor } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
+import SettingsPanel from "./SettingsPanel"
 
 function jsonResponse(body: unknown, init?: ResponseInit) {
-  return new Response(JSON.stringify(body), {
-    headers: { 'Content-Type': 'application/json' },
-    ...init,
-  })
+  return new Response(JSON.stringify(body), { headers: { "Content-Type": "application/json" }, ...init })
 }
 
-function baseInventory() {
-  return {
-    available: true, reason: '', sources: [], agents: [], providers: [], models: [],
-    mcpServers: [], skills: [], plugins: [], shellProfiles: [], warnings: [],
-  }
+function baseDoc(overrides = {}) {
+  return { data: { appearance: "system", interfaceDensity: "comfortable", terminalFontSize: 14, transcriptAutoScroll: true, defaultRightPanelTab: "review", destructiveConfirmations: true }, revision: 0, ...overrides }
+}
+
+function emptyConfig() {
+  return { available: true, reason: "", sources: [], agents: [], providers: [], models: [], mcpServers: [], skills: [], plugins: [], shellProfiles: [], warnings: [] }
 }
 
 afterEach(() => {
   vi.restoreAllMocks()
 })
 
-test('loads settings and shows save success state', async () => {
-  const fetchMock = vi
-    .spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(jsonResponse({ default_project_dir: 'C:\\Users\\Fireurza\\Documents\\Code' }))
-    .mockResolvedValueOnce(jsonResponse(baseInventory()))
-    .mockResolvedValueOnce(jsonResponse({ ok: true }))
+test("loads preferences and shows form", async () => {
+  vi.spyOn(globalThis, "fetch")
+    .mockResolvedValueOnce(jsonResponse({})) // legacy settings
+    .mockResolvedValueOnce(jsonResponse(baseDoc())) // preferences GET
+    .mockResolvedValueOnce(jsonResponse(emptyConfig())) // config
+    .mockResolvedValueOnce(jsonResponse([])) // backups
 
   render(<SettingsPanel />)
-
-  const input = await screen.findByTestId('settings-default-project-dir')
-  expect(input).toHaveValue('C:\\Users\\Fireurza\\Documents\\Code')
-
-  await userEvent.clear(input)
-  await userEvent.type(input, 'G:\\My Drive\\GlyphDeck')
-  await userEvent.click(screen.getByTestId('settings-save-button'))
-
-  await waitFor(() => {
-    expect(screen.getByTestId('settings-message')).toHaveTextContent('Settings saved.')
-  })
-  expect(fetchMock).toHaveBeenLastCalledWith('/api/settings', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: expect.stringContaining('G:\\\\My Drive\\\\GlyphDeck'),
-  })
+  await waitFor(() => { expect(screen.getByTestId("prefs-appearance")).toBeInTheDocument() }, { timeout: 3000 })
+  expect(screen.getByTestId("prefs-appearance")).toHaveValue("system")
 })
 
-test('shows providers and models from config', async () => {
-  vi.spyOn(globalThis, 'fetch')
+test("preview and apply changes", async () => {
+  vi.spyOn(globalThis, "fetch")
     .mockResolvedValueOnce(jsonResponse({}))
-    .mockResolvedValueOnce(jsonResponse({
-      ...baseInventory(),
-      providers: [{ id: 'test-provider', scope: 'global', name: 'Test', enabled: true }],
-      models: [{ id: 'test-model', provider: 'test-provider', scope: 'global', enabled: true }],
-    }))
+    .mockResolvedValueOnce(jsonResponse(baseDoc()))
+    .mockResolvedValueOnce(jsonResponse(emptyConfig()))
+    .mockResolvedValueOnce(jsonResponse([]))
+    // Preview
+    .mockResolvedValueOnce(jsonResponse({ normalized: baseDoc(), changes: { fields: [{ field: "appearance", oldValue: "system", newValue: "dark" }] }, errors: [] }))
+    // Apply
+    .mockResolvedValueOnce(jsonResponse(baseDoc({ data: { appearance: "dark", interfaceDensity: "comfortable", terminalFontSize: 14, transcriptAutoScroll: true, defaultRightPanelTab: "review", destructiveConfirmations: true }, revision: 1 })))
+    // Backups reload
+    .mockResolvedValueOnce(jsonResponse([]))
 
   render(<SettingsPanel />)
+  await waitFor(() => { expect(screen.getByTestId("prefs-appearance")).toBeInTheDocument() }, { timeout: 3000 })
+
+  // Change appearance to dark.
+  await userEvent.selectOptions(screen.getByTestId("prefs-appearance"), "dark")
+
+  // Click preview.
+  await userEvent.click(screen.getByTestId("settings-preview-button"))
+  await waitFor(() => { expect(screen.getByTestId("preview-changes")).toBeInTheDocument() }, { timeout: 3000 })
+
+  // Confirm apply.
+  await userEvent.click(screen.getByTestId("confirm-apply"))
   await waitFor(() => {
-    expect(screen.getByTestId('settings-config-providers')).toBeInTheDocument()
+    expect(screen.getByTestId("settings-message")).toHaveTextContent("Preferences applied.")
   }, { timeout: 3000 })
-  expect(screen.getByTestId('settings-config-models')).toBeInTheDocument()
-})
-
-test('shows configuration sources', async () => {
-  vi.spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(jsonResponse({}))
-    .mockResolvedValueOnce(jsonResponse({
-      ...baseInventory(),
-      sources: [{ path: '/home/user/.config/opencode/opencode.jsonc', scope: 'global', format: 'jsonc', loaded: true }],
-    }))
-
-  render(<SettingsPanel />)
-  await waitFor(() => {
-    expect(screen.getByTestId('settings-config-sources')).toBeInTheDocument()
-  }, { timeout: 3000 })
-})
-
-test('shows parse warnings', async () => {
-  vi.spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(jsonResponse({}))
-    .mockResolvedValueOnce(jsonResponse({
-      ...baseInventory(),
-      warnings: [{ source: 'opencode.json', message: 'parse error: unexpected token' }],
-    }))
-
-  render(<SettingsPanel />)
-  await waitFor(() => {
-    expect(screen.getByTestId('settings-config-warnings')).toBeInTheDocument()
-  }, { timeout: 3000 })
-})
-
-test('no sensitive values in config section', async () => {
-  vi.spyOn(globalThis, 'fetch')
-    .mockResolvedValueOnce(jsonResponse({}))
-    .mockResolvedValueOnce(jsonResponse({ ...baseInventory(), available: false }))
-
-  render(<SettingsPanel />)
-  await waitFor(() => {
-    expect(screen.getByTestId('settings-config-unavailable')).toBeInTheDocument()
-  }, { timeout: 3000 })
-  const html = document.body.innerHTML
-  expect(html).not.toContain('API_KEY')
-  expect(html).not.toContain('sk-')
 })

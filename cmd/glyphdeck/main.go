@@ -12,6 +12,7 @@ import (
 	"glyphdeck/internal/opencode"
 	"glyphdeck/internal/opencode/config"
 	"glyphdeck/internal/permissions"
+	"glyphdeck/internal/preferences"
 	"glyphdeck/internal/problems"
 	"glyphdeck/internal/projects"
 	"glyphdeck/internal/review"
@@ -136,7 +137,14 @@ func main() {
 	problemsMgr := problems.NewManager(100)
 	problems.RegisterHandlers(mux, problemsMgr)
 
-	// Settings.
+	// Settings / Preferences (typed, with revision tracking and backups).
+	if err := preferences.MigrateSchema(db.Conn()); err != nil {
+		log.Fatalf("preferences migration error: %v", err)
+	}
+	prefsStore := preferences.NewStore(db.Conn())
+	preferences.RegisterHandlers(mux, prefsStore)
+
+	// Legacy key-value settings.
 	settingsMgr := settings.NewManager(db.Conn())
 	settings.RegisterHandlers(mux, settingsMgr)
 
