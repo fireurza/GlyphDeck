@@ -67,9 +67,9 @@ function SettingsPanel() {
     try {
       const [legacyData, prefsDoc, configData, backupsData] = await Promise.allSettled([
         requestJson<Record<string, string>>("/api/settings"),
-        requestJson<PrefsDocument>("/api/settings"),
+        requestJson<PrefsDocument>("/api/preferences"),
         requestJson<ConfigInventory>("/api/opencode/config/inventory"),
-        requestJson<BackupEntry[]>("/api/settings/backups"),
+        requestJson<BackupEntry[]>("/api/preferences/backups"),
       ])
       if (legacyData.status === "fulfilled") {
         setSettings(legacyData.value)
@@ -115,7 +115,7 @@ function SettingsPanel() {
   // Preview preferences changes.
   async function handlePreview() {
     try {
-      const result = await requestJson<PreviewResult>("/api/settings/preview", {
+      const result = await requestJson<PreviewResult>("/api/preferences/preview", {
         method: "POST",
         body: JSON.stringify(prefs),
       })
@@ -137,7 +137,7 @@ function SettingsPanel() {
     setSaving(true)
     setShowConfirm(false)
     try {
-      const doc = await requestJson<PrefsDocument>("/api/settings", {
+      const doc = await requestJson<PrefsDocument>("/api/preferences", {
         method: "PUT",
         body: JSON.stringify({ data: prefs, expectedRevision: revision }),
       })
@@ -163,7 +163,7 @@ function SettingsPanel() {
   async function handleRestore(backupId: number) {
     if (!window.confirm("Restore this backup? Current settings will be saved as a new backup.")) return
     try {
-      const doc = await requestJson<PrefsDocument>(`/api/settings/backups/${backupId}/restore`, {
+      const doc = await requestJson<PrefsDocument>(`/api/preferences/backups/${backupId}/restore`, {
         method: "POST",
       })
       setPrefs(doc.data)

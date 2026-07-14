@@ -19,6 +19,7 @@ import (
 	"glyphdeck/internal/sandboxes"
 	"glyphdeck/internal/servers"
 	"glyphdeck/internal/sessions"
+	"glyphdeck/internal/settings"
 	"glyphdeck/internal/storage"
 	"glyphdeck/internal/terminal"
 	"glyphdeck/internal/usage"
@@ -142,6 +143,10 @@ func main() {
 	}
 	prefsStore := preferences.NewStore(db.Conn())
 	preferences.RegisterHandlers(mux, prefsStore)
+
+	// Legacy key-value settings.
+	settingsMgr := settings.NewManager(db.Conn())
+	settings.RegisterHandlers(mux, settingsMgr)
 
 	// Events hub — bridges OpenCode SSE to browser clients.
 	eventsHub := events.NewHub()

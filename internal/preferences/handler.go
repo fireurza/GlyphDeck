@@ -24,11 +24,11 @@ func NewHandler(store *Store) *Handler {
 // RegisterHandlers mounts preference routes.
 func RegisterHandlers(mux *http.ServeMux, store *Store) {
 	h := NewHandler(store)
-	mux.HandleFunc("GET /api/settings", h.getSettings)
-	mux.HandleFunc("POST /api/settings/preview", h.preview)
-	mux.HandleFunc("PUT /api/settings", h.update)
-	mux.HandleFunc("GET /api/settings/backups", h.listBackups)
-	mux.HandleFunc("POST /api/settings/backups/{id}/restore", h.restore)
+	mux.HandleFunc("GET /api/preferences", h.getSettings)
+	mux.HandleFunc("POST /api/preferences/preview", h.preview)
+	mux.HandleFunc("PUT /api/preferences", h.update)
+	mux.HandleFunc("GET /api/preferences/backups", h.listBackups)
+	mux.HandleFunc("POST /api/preferences/backups/{id}/restore", h.restore)
 }
 
 func (h *Handler) getSettings(w http.ResponseWriter, r *http.Request) {
